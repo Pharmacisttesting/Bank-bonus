@@ -24,7 +24,7 @@
 
     // Populated at runtime from Worker /config — never hardcoded
     let GOOGLE_CLIENT_ID = null;
-    let gapiInited = false, gisInited = false, tokenClient = null;
+    let gapiInited = false, gisInited = false, configLoaded = false, tokenClient = null;
 
     // ── Fetch client ID from Worker, then init GIS ───────────────────────
     async function loadConfig() {
@@ -33,6 +33,7 @@
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const cfg = await res.json();
         GOOGLE_CLIENT_ID = cfg.clientId;
+        configLoaded = true;
         // If GIS script already fired, init now; otherwise gisLoaded() will handle it
         if (typeof google !== 'undefined' && google.accounts) {
           initTokenClient();
@@ -86,7 +87,7 @@
     // ── Boot timeout: if APIs not ready in 6s, show actionable diagnosis ─────
     window.addEventListener('load', function() {
       setTimeout(function() {
-        if (gapiInited && gisInited) return; // all good
+        if (gapiInited && gisInited && configLoaded) return; // all good
 
         var origin = window.location.origin;
         var proto  = window.location.protocol;
@@ -166,7 +167,7 @@
     function maybeEnableDriveButtons() {
       updateDiagnostics();
       // Both APIs must be ready AND the DOM must be painted
-      if (!gapiInited || !gisInited) return;
+      if (!gapiInited || !gisInited || !configLoaded) return;
       const btn = document.getElementById('drive-connect-btn');
       if (btn) {
         btn.disabled = false;
