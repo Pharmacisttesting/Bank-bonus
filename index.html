@@ -11,55 +11,41 @@
 
   <!-- Google Drive config -->
   <script>
-   // This is your new secure gateway
-  const workerUrl = "https://google-api-proxy.ishangajera.workers.dev";
+    // ── Config ───────────────────────────────────────────────────────────
+    // Zero credentials in this file. GOOGLE_CLIENT_ID and GOOGLE_API_KEY both
+    // live as secrets in the Cloudflare Worker. The client ID is fetched at
+    // runtime from /config before any Google API is initialised.
 
-  async function loadBankBonuses() {
-    try {
-      // 1. Fetch from your Cloudflare Worker instead of Google
-      const response = await fetch(workerUrl);
-      const data = await response.json();
-
-      // 2. Use the data (this part depends on your specific app logic)
-      console.log("Data received safely:", data);
-      displayData(data); // Assuming you have a function to show the results
-
-    } catch (error) {
-      console.error("Error fetching through Worker:", error);
-    }
-  }
-
-  // Run the function when the page is ready
-  document.addEventListener("DOMContentLoaded", loadBankBonuses);
-    
-    // No hardcoded folder ID — we find or create the folder dynamically in each user's Drive
+    const DRIVE_PROXY_BASE  = 'https://google-api-proxy.ishangajera.workers.dev';
     const DRIVE_FOLDER_NAME = 'Bank-Bonus-App-Data';
     const DRIVE_FILE_NAME   = 'bank-bonus-tracker.json';
     const GOOGLE_DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
-    // Two scopes combined:
-    // - drive.metadata.readonly: lets us SEARCH for the existing folder/file by name
-    //   (works across all sessions/devices, finds pre-existing files)
-    // - drive.file: lets us CREATE and WRITE files (only files this app touches)
-    // Together they solve the "can't find old files" problem without needing
-    // full drive access (which requires Google app verification).
     const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.metadata.readonly https://www.googleapis.com/auth/drive.file';
 
+    // Populated at runtime from Worker /config — never hardcoded
+    let GOOGLE_CLIENT_ID = null;
     let gapiInited = false, gisInited = false, tokenClient = null;
 
-    function gapiLoaded() {
-      gapi.load('client', async () => {
-        try {
-          await gapi.client.init({ apiKey: GOOGLE_API_KEY, discoveryDocs: [GOOGLE_DISCOVERY_DOC] });
-          gapiInited = true;
-        } catch(e) {
-          console.error('[Drive] gapi.client.init failed:', e);
-          const dNote = document.getElementById('diag-note');
-          if (dNote) { dNote.style.display=''; dNote.textContent='❌ gapi init error: '+e.message; }
+    // ── Fetch client ID from Worker, then init GIS ───────────────────────
+    async function loadConfig() {
+      try {
+        const res = await fetch(DRIVE_PROXY_BASE + '/config');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const cfg = await res.json();
+        GOOGLE_CLIENT_ID = cfg.clientId;
+        // If GIS script already fired, init now; otherwise gisLoaded() will handle it
+        if (typeof google !== 'undefined' && google.accounts) {
+          initTokenClient();
         }
-        maybeEnableDriveButtons();
-      });
+      } catch(e) {
+        console.error('[Config] Failed to load config from Worker:', e);
+        const dNote = document.getElementById('diag-note');
+        if (dNote) { dNote.style.display=''; dNote.textContent='\u274c Config load failed \u2014 is the Worker deployed? ' + e.message; }
+      }
     }
-    function gisLoaded() {
+
+    function initTokenClient() {
+      if (!GOOGLE_CLIENT_ID) return; // config not yet loaded — gisLoaded will retry
       try {
         tokenClient = google.accounts.oauth2.initTokenClient({
           client_id: GOOGLE_CLIENT_ID,
@@ -70,10 +56,32 @@
       } catch(e) {
         console.error('[Drive] GIS init failed:', e);
         const dNote = document.getElementById('diag-note');
-        if (dNote) { dNote.style.display=''; dNote.textContent='❌ GIS init error: '+e.message; }
+        if (dNote) { dNote.style.display=''; dNote.textContent='\u274c GIS init error: '+e.message; }
       }
       maybeEnableDriveButtons();
     }
+
+    function gapiLoaded() {
+      gapi.load('client', async () => {
+        try {
+          // No apiKey here — Drive calls go via the Worker proxy which injects it server-side
+          await gapi.client.init({ discoveryDocs: [GOOGLE_DISCOVERY_DOC] });
+          gapiInited = true;
+        } catch(e) {
+          console.error('[Drive] gapi.client.init failed:', e);
+          const dNote = document.getElementById('diag-note');
+          if (dNote) { dNote.style.display=''; dNote.textContent='\u274c gapi init error: '+e.message; }
+        }
+        maybeEnableDriveButtons();
+      });
+    }
+    function gisLoaded() {
+      // GIS script loaded — init only if config fetch already completed
+      initTokenClient();
+    }
+
+    // Kick off config fetch immediately
+    loadConfig();
 
     // ── Boot timeout: if APIs not ready in 6s, show actionable diagnosis ─────
     window.addEventListener('load', function() {
@@ -181,6 +189,10 @@
     //                             folders/files from any device/session)
     //   drive.file              — read and write files the app touches
     //
+    // All calls go through the Cloudflare Worker proxy (DRIVE_PROXY_BASE).
+    // The Worker injects the API key server-side — it is never exposed in this file.
+    // The user's OAuth Bearer token is passed through transparently.
+    //
     // On every device connect:
     //   1. Search for the folder by name (metadata.readonly finds it regardless of session)
     //   2. Search for the data file inside it
@@ -189,51 +201,59 @@
     //
     // This guarantees website → mobile → website sync works correctly.
 
+    // Helper: call our proxy with the user's Bearer token
+    async function proxyFetch(path, options = {}) {
+      const token = gapi.auth.getToken().access_token;
+      const url = DRIVE_PROXY_BASE + path;
+      const res = await fetch(url, {
+        ...options,
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Accept': 'application/json',
+          ...(options.headers || {}),
+        },
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error('Drive proxy error ' + res.status + ': ' + text);
+      }
+      return res;
+    }
+
     async function getOrCreateFolder() {
       // metadata.readonly scope allows searching across ALL of the user's Drive,
       // regardless of which device/session created the folder originally.
-      const res = await gapi.client.drive.files.list({
-        q: "mimeType='application/vnd.google-apps.folder' and name='" + DRIVE_FOLDER_NAME + "' and trashed=false",
-        fields: 'files(id, name, createdTime)',
-        spaces: 'drive',
-        pageSize: 20,
-        orderBy: 'createdTime',   // oldest first — prefer the original folder
-      });
-
-      const folders = (res.result.files || []);
+      const q = encodeURIComponent("mimeType='application/vnd.google-apps.folder' and name='" + DRIVE_FOLDER_NAME + "' and trashed=false");
+      const res = await proxyFetch('/drive/v3/files?q=' + q + '&fields=files(id,name,createdTime)&spaces=drive&pageSize=20&orderBy=createdTime');
+      const data = await res.json();
+      const folders = data.files || [];
 
       if (folders.length > 0) {
-        // Use the oldest folder — that's the canonical one
         const folder = folders[0];
         console.log('[Drive] Found folder "' + DRIVE_FOLDER_NAME + '" id=' + folder.id + ' (' + folders.length + ' found)');
-        if (folders.length > 1) {
-          console.warn('[Drive] Multiple folders found — using oldest:', folder.id);
-        }
+        if (folders.length > 1) console.warn('[Drive] Multiple folders found — using oldest:', folder.id);
         return folder.id;
       }
 
-      // No folder found at all — create a fresh one
+      // No folder found — create a fresh one
       console.log('[Drive] Creating folder:', DRIVE_FOLDER_NAME);
-      const created = await gapi.client.drive.files.create({
-        resource: { name: DRIVE_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' },
-        fields: 'id',
+      const created = await proxyFetch('/drive/v3/files?fields=id', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: DRIVE_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' }),
       });
-      console.log('[Drive] Created folder:', created.result.id);
-      return created.result.id;
+      const createdData = await created.json();
+      console.log('[Drive] Created folder:', createdData.id);
+      return createdData.id;
     }
 
     async function findFileInFolder(folderId) {
       // metadata.readonly lets us find the file even if it was created in
       // a different browser/session. Returns the most recently modified match.
-      const res = await gapi.client.drive.files.list({
-        q: "name='" + DRIVE_FILE_NAME + "' and '" + folderId + "' in parents and trashed=false",
-        fields: 'files(id, name, modifiedTime)',
-        spaces: 'drive',
-        pageSize: 10,
-        orderBy: 'modifiedTime desc',  // most recent first
-      });
-
-      const files = (res.result.files || []);
+      const q = encodeURIComponent("name='" + DRIVE_FILE_NAME + "' and '" + folderId + "' in parents and trashed=false");
+      const res = await proxyFetch('/drive/v3/files?q=' + q + '&fields=files(id,name,modifiedTime)&spaces=drive&pageSize=10&orderBy=modifiedTime+desc');
+      const data = await res.json();
+      const files = data.files || [];
 
       if (files.length > 0) {
         console.log('[Drive] Found file id=' + files[0].id + ' modified=' + files[0].modifiedTime);
@@ -1644,10 +1664,11 @@
       '--' + boundary, 'Content-Type: application/json', '', content,
       '--' + boundary + '--',
     ].join('\r\n');
-    const url = fileId
-      ? 'https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=multipart'
-      : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
-    const res = await fetch(url, {
+    // Route through Worker proxy — API key is injected server-side
+    const path = fileId
+      ? '/upload/drive/v3/files/' + fileId + '?uploadType=multipart'
+      : '/upload/drive/v3/files?uploadType=multipart';
+    const res = await fetch(DRIVE_PROXY_BASE + path, {
       method: fileId ? 'PATCH' : 'POST',
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'multipart/related; boundary=' + boundary },
       body,
@@ -1708,8 +1729,9 @@
       localStorage.setItem(DRIVE_FILE_ID_KEY, driveFileId);
       setDriveStatus('↻ Loading your data…');
 
-      const cr  = await gapi.client.drive.files.get({ fileId: driveFileId, alt: 'media' });
-      const raw = typeof cr.body === 'string' ? cr.body : JSON.stringify(cr.result);
+      // Read the file content via the Worker proxy
+      const fileRes = await proxyFetch('/drive/v3/files/' + driveFileId + '?alt=media');
+      const raw = await fileRes.text();
       const driveData = deserializeData(raw);
 
       // ── Step 4: Merge strategy ────────────────────────────────────────────
