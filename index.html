@@ -270,8 +270,37 @@
   <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
 
   <style>
-    /* ── Theme: MCM Light (default) ── */
-    :root, [data-theme="mcm-light"] {
+    /* ── Theme: Clean Light (default) ── */
+    :root, [data-theme="clean-light"] {
+      --bg: #f0f2f0;
+      --surface: #ffffff;
+      --surface-2: #f7f9f7;
+      --surface-3: #edf0ec;
+      --border: #d0d8cc;
+      --border-bright: #bcc8b6;
+      --text: #1a2118;
+      --text-muted: #5a7050;
+      --text-dim: #8fa085;
+      --accent: #1e9e55;
+      --accent-dim: #d0f0e0;
+      --accent-glow: rgba(30,158,85,0.10);
+      --accent-soft: rgba(30,158,85,0.07);
+      --red: #c0392b;
+      --red-dim: #fde8e6;
+      --amber: #c07c00;
+      --amber-dim: #fef3dc;
+      --blue: #2e7cb8;
+      --blue-dim: #e8f0fe;
+      --pink: #b0478a;
+      --font-body: 'Sora', system-ui, sans-serif;
+      --font-mono: 'IBM Plex Mono', monospace;
+      --r-sm: 4px; --r-md: 8px; --r-lg: 12px;
+      --transition: 150ms cubic-bezier(0.16,1,0.3,1);
+      --glow: 0 0 20px rgba(30,158,85,0.06), 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+    /* ── Theme: MCM Light ── */
+    [data-theme="mcm-light"] {
       --bg: #d8d0c0;
       --surface: #e2dace;
       --surface-2: #cac2b0;
@@ -357,35 +386,6 @@
       --glow: 0 0 20px rgba(61,220,132,0.08), 0 1px 3px rgba(0,0,0,0.4);
     }
 
-    /* ── Theme: Clean Light ── */
-    [data-theme="clean-light"] {
-      --bg: #f0f2f0;
-      --surface: #ffffff;
-      --surface-2: #f7f9f7;
-      --surface-3: #edf0ec;
-      --border: #d0d8cc;
-      --border-bright: #bcc8b6;
-      --text: #1a2118;
-      --text-muted: #5a7050;
-      --text-dim: #8fa085;
-      --accent: #1e9e55;
-      --accent-dim: #d0f0e0;
-      --accent-glow: rgba(30,158,85,0.10);
-      --accent-soft: rgba(30,158,85,0.07);
-      --red: #c0392b;
-      --red-dim: #fde8e6;
-      --amber: #c07c00;
-      --amber-dim: #fef3dc;
-      --blue: #2e7cb8;
-      --blue-dim: #e8f0fe;
-      --pink: #b0478a;
-      --font-body: 'Sora', system-ui, sans-serif;
-      --font-mono: 'IBM Plex Mono', monospace;
-      --r-sm: 4px; --r-md: 8px; --r-lg: 12px;
-      --transition: 150ms cubic-bezier(0.16,1,0.3,1);
-      --glow: 0 0 20px rgba(30,158,85,0.06), 0 1px 4px rgba(0,0,0,0.08);
-    }
-
     /* ── Theme switcher UI ── */
     .theme-switcher { display:flex; align-items:center; gap:6px; margin-left:12px; }
     .theme-switcher-label { font-family:var(--font-mono); font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-muted); }
@@ -393,9 +393,9 @@
     .theme-btn:hover { transform:scale(1.15); }
     .theme-btn.active { border-color:var(--text); box-shadow:0 0 0 2px var(--text-muted); }
     .theme-btn[data-theme-pick="clean-light"] { background:#ffffff; border:1.5px solid #bcc8b6; }
-    .theme-btn[data-theme-pick="mcm-light"]  { background:#d8d0c0; }
-    .theme-btn[data-theme-pick="mcm-dark"]   { background:#443a28; }
-    .theme-btn[data-theme-pick="dark-green"] { background:#111410; }
+    .theme-btn[data-theme-pick="mcm-light"]   { background:#d8d0c0; }
+    .theme-btn[data-theme-pick="mcm-dark"]    { background:#443a28; }
+    .theme-btn[data-theme-pick="dark-green"]  { background:#111410; }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
@@ -1317,6 +1317,37 @@
     }
     .cal-month-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
     .cal-month-btn.active { background: var(--accent); color: #0a0c0b; font-weight: 700; border-color: var(--accent); }
+
+    /* ── Date Picker Wrapper ── */
+    .date-input-wrap { position:relative; display:flex; align-items:center; }
+    .date-input-wrap input[type="date"] { width:100%; padding-right:36px; }
+    .date-cal-btn { position:absolute; right:0; top:50%; transform:translateY(-50%); width:32px; height:100%; display:flex; align-items:center; justify-content:center; background:none; border:none; border-left:1px solid var(--border); cursor:pointer; color:var(--text-muted); font-size:13px; transition:color var(--transition),background var(--transition); border-radius:0 var(--r-sm) var(--r-sm) 0; }
+    .date-cal-btn:hover { color:var(--accent); background:var(--accent-soft); }
+    /* ── Calendar Popup ── */
+    .cal-popup { position:fixed; z-index:99999; background:var(--surface-2); border:1px solid var(--border-bright); border-radius:var(--r-md); box-shadow:0 16px 48px rgba(0,0,0,0.3),0 0 0 1px var(--accent-soft); padding:14px; width:260px; user-select:none; animation:fadeIn 0.12s ease both; }
+    .cal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+    .cal-nav { background:none; border:1px solid var(--border); border-radius:var(--r-sm); color:var(--text-muted); cursor:pointer; font-size:13px; width:26px; height:26px; display:flex; align-items:center; justify-content:center; transition:all var(--transition); }
+    .cal-nav:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+    .cal-month-label { font-family:var(--font-mono); font-size:11px; font-weight:600; color:var(--text); letter-spacing:0.04em; cursor:pointer; }
+    .cal-month-label:hover { color:var(--accent); }
+    .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+    .cal-dow { font-family:var(--font-mono); font-size:8px; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-dim); text-align:center; padding:3px 0 5px; }
+    .cal-day { width:100%; aspect-ratio:1; display:flex; align-items:center; justify-content:center; border-radius:var(--r-sm); font-size:11px; cursor:pointer; color:var(--text); border:1px solid transparent; transition:all var(--transition); font-family:var(--font-mono); }
+    .cal-day:hover { background:var(--surface-3); border-color:var(--border); }
+    .cal-day.today { border-color:var(--accent); color:var(--accent); }
+    .cal-day.selected { background:var(--accent); color:var(--surface); font-weight:700; border-color:var(--accent); }
+    .cal-day.other-month { color:var(--text-dim); }
+    .cal-footer { display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:8px; border-top:1px solid var(--border); gap:6px; }
+    .cal-today-btn,.cal-clear-btn { font-family:var(--font-mono); font-size:10px; background:none; border:1px solid var(--border); border-radius:var(--r-sm); color:var(--text-muted); cursor:pointer; padding:4px 10px; transition:all var(--transition); }
+    .cal-today-btn:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+    .cal-clear-btn:hover { border-color:var(--red); color:var(--red); background:var(--red-dim); }
+    .cal-close-btn { font-family:var(--font-mono); font-size:10px; background:none; border:none; color:var(--text-dim); cursor:pointer; padding:4px 6px; transition:all var(--transition); margin-left:auto; }
+    .cal-close-btn:hover { color:var(--text-muted); }
+    .cal-year-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:4px; max-height:200px; overflow-y:auto; }
+    .cal-year-btn,.cal-month-btn { font-family:var(--font-mono); font-size:10px; background:none; border:1px solid var(--border); border-radius:var(--r-sm); color:var(--text); cursor:pointer; padding:5px 2px; text-align:center; transition:all var(--transition); }
+    .cal-year-btn:hover,.cal-month-btn:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+    .cal-year-btn.active,.cal-month-btn.active { background:var(--accent); color:var(--surface); font-weight:700; border-color:var(--accent); }
+    .cal-month-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:4px; margin-top:8px; }
   </style>
 </head>
 <body>
@@ -1638,14 +1669,14 @@
           <div>
             <label for="dateOpened">Date Opened</label>
             <div class="date-input-wrap">
-              <input id="dateOpened" type="date">
+              <div class="date-input-wrap"><input id="dateOpened" type="date"><button type="button" class="date-cal-btn" data-target="dateOpened" title="Open calendar">📅</button></div>
               <button type="button" class="date-cal-btn" data-target="dateOpened" title="Open calendar">📅</button>
             </div>
           </div>
           <div>
             <label for="offerExpiration">Offer Expiration</label>
             <div class="date-input-wrap">
-              <input id="offerExpiration" type="date">
+              <div class="date-input-wrap"><input id="offerExpiration" type="date"><button type="button" class="date-cal-btn" data-target="offerExpiration" title="Open calendar">📅</button></div>
               <button type="button" class="date-cal-btn" data-target="offerExpiration" title="Open calendar">📅</button>
             </div>
             <div class="helper-text">When the sign-up offer expires.</div>
@@ -1653,28 +1684,28 @@
           <div>
             <label for="deadline">Deadline to Meet Requirements</label>
             <div class="date-input-wrap">
-              <input id="deadline" type="date">
+              <div class="date-input-wrap"><input id="deadline" type="date"><button type="button" class="date-cal-btn" data-target="deadline" title="Open calendar">📅</button></div>
               <button type="button" class="date-cal-btn" data-target="deadline" title="Open calendar">📅</button>
             </div>
           </div>
           <div>
             <label for="dateRequirementsMet">Date Requirements Met</label>
             <div class="date-input-wrap">
-              <input id="dateRequirementsMet" type="date">
+              <div class="date-input-wrap"><input id="dateRequirementsMet" type="date"><button type="button" class="date-cal-btn" data-target="dateRequirementsMet" title="Open calendar">📅</button></div>
               <button type="button" class="date-cal-btn" data-target="dateRequirementsMet" title="Open calendar">📅</button>
             </div>
           </div>
           <div>
             <label for="dateBonusPosted">Date Bonus Posted</label>
             <div class="date-input-wrap">
-              <input id="dateBonusPosted" type="date">
+              <div class="date-input-wrap"><input id="dateBonusPosted" type="date"><button type="button" class="date-cal-btn" data-target="dateBonusPosted" title="Open calendar">📅</button></div>
               <button type="button" class="date-cal-btn" data-target="dateBonusPosted" title="Open calendar">📅</button>
             </div>
           </div>
           <div>
             <label for="dateClosed">Date Closed</label>
             <div class="date-input-wrap">
-              <input id="dateClosed" type="date">
+              <div class="date-input-wrap"><input id="dateClosed" type="date"><button type="button" class="date-cal-btn" data-target="dateClosed" title="Open calendar">📅</button></div>
               <button type="button" class="date-cal-btn" data-target="dateClosed" title="Open calendar">📅</button>
             </div>
           </div>
@@ -1714,7 +1745,7 @@
           <div>
             <label for="pullDate">Pull Date</label>
             <div class="date-input-wrap">
-              <input id="pullDate" type="date">
+              <div class="date-input-wrap"><input id="pullDate" type="date"><button type="button" class="date-cal-btn" data-target="pullDate" title="Open calendar">📅</button></div>
               <button type="button" class="date-cal-btn" data-target="pullDate" title="Open calendar">📅</button>
             </div>
           </div>
@@ -2483,7 +2514,6 @@
     clonePillEl.style.display = 'none';
     formErrorEl.style.display = 'none';
     formEl.reset(); el('bonus-id').value = '';
-    // Apply smart defaults
     el('cooldownPreset').value = '12';
     el('cooldownMonths').value = '12';
     el('repeatAnchor').value = 'closed';
@@ -2974,26 +3004,6 @@
   // handles the case where the button isn't in the DOM yet when the APIs fire.
 })();
 
-// ══ THEME SWITCHER ═══════════════════════════════════════════════════════
-(function() {
-  const THEME_KEY = 'bbt-theme';
-  function applyTheme(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem(THEME_KEY, theme);
-    document.querySelectorAll('.theme-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.themePick === theme);
-    });
-  }
-  // Load saved theme, default to mcm-light
-  const saved = localStorage.getItem(THEME_KEY) || 'clean-light';
-  applyTheme(saved);
-  document.addEventListener('click', function(e) {
-    const btn = e.target.closest('.theme-btn');
-    if (!btn) return;
-    applyTheme(btn.dataset.themePick);
-  });
-})();
-
 // ══ CALENDAR PICKER ══════════════════════════════════════════════════════
 (function() {
   const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -3098,6 +3108,91 @@
   window.addEventListener('scroll',()=>{if(popup&&activeInput){const b=document.querySelector(`.date-cal-btn[data-target="${activeInput.id}"]`);if(b)positionPopup(b);}},true);
   window.addEventListener('resize',()=>{if(popup&&activeInput){const b=document.querySelector(`.date-cal-btn[data-target="${activeInput.id}"]`);if(b)positionPopup(b);}});
 })();
+
+// ══ THEME SWITCHER ═══════════════════════════════════════════════════════
+(function() {
+  const THEME_KEY = 'bbt-theme';
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem(THEME_KEY, theme);
+    document.querySelectorAll('.theme-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.themePick === theme);
+    });
+  }
+  const saved = localStorage.getItem(THEME_KEY) || 'clean-light';
+  applyTheme(saved);
+  document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.theme-btn');
+    if (!btn) return;
+    applyTheme(btn.dataset.themePick);
+  });
+})();
+
+// ══ CALENDAR PICKER ═══════════════════════════════════════════════════════
+(function() {
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+  let popup=null, activeInput=null, viewYear=null, viewMonth=null;
+
+  function todayStr() { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function parseInputDate(input) { const m=(input.value||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m?{y:+m[1],mo:+m[2]-1,d:+m[3]}:null; }
+  function setInputDate(input,y,mo,d) { input.value=y+'-'+String(mo+1).padStart(2,'0')+'-'+String(d).padStart(2,'0'); input.dispatchEvent(new Event('change',{bubbles:true})); input.dispatchEvent(new Event('input',{bubbles:true})); }
+  function positionPopup(btn) { const rect=btn.closest('.date-input-wrap').getBoundingClientRect(); let left=rect.left,top=rect.bottom+4; if(left+260>window.innerWidth-8)left=window.innerWidth-268; if(top+320>window.innerHeight-8)top=rect.top-324; popup.style.left=left+'px'; popup.style.top=top+'px'; }
+
+  function renderDaysView() {
+    const today=todayStr(), sel=parseInputDate(activeInput);
+    const firstDay=new Date(viewYear,viewMonth,1).getDay();
+    const daysInMonth=new Date(viewYear,viewMonth+1,0).getDate();
+    const daysInPrev=new Date(viewYear,viewMonth,0).getDate();
+    let html=`<div class="cal-header"><button class="cal-nav" id="cal-prev">&#8249;</button><span class="cal-month-label" id="cal-mlabel">${MONTHS[viewMonth]} ${viewYear}</span><button class="cal-nav" id="cal-next">&#8250;</button></div><div class="cal-grid">${DAYS.map(d=>`<div class="cal-dow">${d}</div>`).join('')}`;
+    for(let i=0;i<firstDay;i++){const day=daysInPrev-firstDay+1+i,mo=viewMonth-1<0?11:viewMonth-1,yr=viewMonth-1<0?viewYear-1:viewYear;html+=`<div class="cal-day other-month" data-date="${yr}-${String(mo+1).padStart(2,'0')}-${String(day).padStart(2,'0')}">${day}</div>`;}
+    for(let d=1;d<=daysInMonth;d++){const ds=`${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;let cls='cal-day'+(ds===today?' today':'')+(sel&&ds===`${sel.y}-${String(sel.mo+1).padStart(2,'0')}-${String(sel.d).padStart(2,'0')}`?' selected':'');html+=`<div class="${cls}" data-date="${ds}">${d}</div>`;}
+    const rem=(firstDay+daysInMonth)%7===0?0:7-(firstDay+daysInMonth)%7;
+    for(let i=1;i<=rem;i++){const mo=viewMonth+1>11?0:viewMonth+1,yr=viewMonth+1>11?viewYear+1:viewYear;html+=`<div class="cal-day other-month" data-date="${yr}-${String(mo+1).padStart(2,'0')}-${String(i).padStart(2,'0')}">${i}</div>`;}
+    html+=`</div><div class="cal-footer"><button class="cal-today-btn" id="cal-today">Today</button><button class="cal-clear-btn" id="cal-clear">Clear</button><button class="cal-close-btn" id="cal-close">✕</button></div>`;
+    popup.innerHTML=html;
+    popup.querySelector('#cal-prev').onclick=()=>{viewMonth--;if(viewMonth<0){viewMonth=11;viewYear--;}renderDaysView();};
+    popup.querySelector('#cal-next').onclick=()=>{viewMonth++;if(viewMonth>11){viewMonth=0;viewYear++;}renderDaysView();};
+    popup.querySelector('#cal-mlabel').onclick=()=>renderMonthYearView();
+    popup.querySelector('#cal-today').onclick=()=>{const d=new Date();setInputDate(activeInput,d.getFullYear(),d.getMonth(),d.getDate());closePopup();};
+    popup.querySelector('#cal-clear').onclick=()=>{activeInput.value='';activeInput.dispatchEvent(new Event('change',{bubbles:true}));closePopup();};
+    popup.querySelector('#cal-close').onclick=closePopup;
+    popup.querySelectorAll('.cal-day').forEach(cell=>cell.addEventListener('click',()=>{const[y,mo,d]=cell.dataset.date.split('-').map(Number);setInputDate(activeInput,y,mo-1,d);closePopup();}));
+  }
+
+  function renderMonthYearView() {
+    const cur=new Date().getFullYear();
+    let yBtns='';for(let y=cur+5;y>=cur-10;y--)yBtns+=`<button class="cal-year-btn${y===viewYear?' active':''}" data-yr="${y}">${y}</button>`;
+    const mBtns=MONTHS_SHORT.map((m,i)=>`<button class="cal-month-btn${i===viewMonth?' active':''}" data-mo="${i}">${m}</button>`).join('');
+    popup.innerHTML=`<div class="cal-header"><button class="cal-nav" id="cal-back">&#8592;</button><span style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--text);">Select Month / Year</span><button class="cal-close-btn" id="cal-close2" style="margin-left:0;">✕</button></div><div class="cal-month-grid">${mBtns}</div><div style="margin-top:10px;font-family:var(--font-mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Year</div><div class="cal-year-grid">${yBtns}</div>`;
+    popup.querySelector('#cal-back').onclick=renderDaysView;
+    popup.querySelector('#cal-close2').onclick=closePopup;
+    popup.querySelectorAll('.cal-month-btn').forEach(b=>b.addEventListener('click',()=>{viewMonth=+b.dataset.mo;renderDaysView();}));
+    popup.querySelectorAll('.cal-year-btn').forEach(b=>b.addEventListener('click',()=>{viewYear=+b.dataset.yr;renderDaysView();}));
+    setTimeout(()=>{const a=popup.querySelector('.cal-year-btn.active');if(a)a.scrollIntoView({block:'center'});},0);
+  }
+
+  function openPopup(btn) {
+    closePopup();
+    activeInput=document.getElementById(btn.dataset.target);
+    if(!activeInput)return;
+    const p=parseInputDate(activeInput),now=new Date();
+    viewYear=p?p.y:now.getFullYear();viewMonth=p?p.mo:now.getMonth();
+    popup=document.createElement('div');popup.className='cal-popup';
+    document.body.appendChild(popup);renderDaysView();positionPopup(btn);
+  }
+  function closePopup(){if(popup){popup.remove();popup=null;}activeInput=null;}
+  document.addEventListener('click',function(e){
+    if(popup&&!popup.contains(e.target)&&!e.target.classList.contains('date-cal-btn')){closePopup();return;}
+    const btn=e.target.closest('.date-cal-btn');if(!btn)return;
+    e.preventDefault();e.stopPropagation();
+    if(popup&&activeInput&&activeInput.id===btn.dataset.target)closePopup();else openPopup(btn);
+  },true);
+  window.addEventListener('scroll',()=>{if(popup&&activeInput){const b=document.querySelector(`.date-cal-btn[data-target="${activeInput.id}"]`);if(b)positionPopup(b);}},true);
+  window.addEventListener('resize',()=>{if(popup&&activeInput){const b=document.querySelector(`.date-cal-btn[data-target="${activeInput.id}"]`);if(b)positionPopup(b);}});
+})();
+
 </script>
 </body>
 </html>
