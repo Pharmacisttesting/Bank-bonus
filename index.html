@@ -1391,12 +1391,12 @@
       <div class="summary-card">
         <div class="summary-label">Expected Bonuses</div>
         <div class="summary-value" id="summary-expected">$0</div>
-        <div class="summary-sub">All non‑cancelled</div>
+        <div class="summary-sub">Planned (incl. rechurn-ready)</div>
       </div>
       <div class="summary-card">
-        <div class="summary-label">Received (All Time)</div>
-        <div class="summary-value" id="summary-received">$0</div>
-        <div class="summary-sub">Based on posted dates</div>
+        <div class="summary-label">Pending</div>
+        <div class="summary-value" id="summary-pending-year">$0</div>
+        <div class="summary-sub">In progress / requirements met</div>
       </div>
       <div class="summary-card">
         <div class="summary-label">Received This Year</div>
@@ -1404,14 +1404,14 @@
         <div class="summary-sub" id="summary-tax-year-label">Current calendar year</div>
       </div>
       <div class="summary-card">
-        <div class="summary-label">Pending This Year</div>
-        <div class="summary-value" id="summary-pending-year">$0</div>
-        <div class="summary-sub">Planned / in progress</div>
+        <div class="summary-label">Received (All Time)</div>
+        <div class="summary-value" id="summary-received">$0</div>
+        <div class="summary-sub">Posted · closing · closed</div>
       </div>
     </div>
 
     <!-- Per-person summary -->
-    <div class="summary-grid" id="person-summary" style="margin-bottom:16px;">
+    <div class="summary-grid" id="person-summary" style="margin-bottom:16px;grid-template-columns:repeat(2,1fr);">
       <div class="summary-card">
         <div class="summary-label">You — Expected</div>
         <div class="summary-value" id="ps-you-expected">$0</div>
@@ -1421,16 +1421,6 @@
         <div class="summary-label">Spouse — Expected</div>
         <div class="summary-value" id="ps-spouse-expected">$0</div>
         <div class="summary-sub" id="ps-spouse-roi"></div>
-      </div>
-      <div class="summary-card">
-        <div class="summary-label">Joint — Expected</div>
-        <div class="summary-value" id="ps-joint-expected">$0</div>
-        <div class="summary-sub" id="ps-joint-roi"></div>
-      </div>
-      <div class="summary-card">
-        <div class="summary-label">Avg $/day (open)</div>
-        <div class="summary-value" id="ps-avg-roi" style="color:var(--text)">—</div>
-        <div class="summary-sub">Bonus ÷ days open</div>
       </div>
     </div>
 
@@ -2155,37 +2145,51 @@
 
   // ── Summary ────────────────────────────────────────────────────────────
   function renderSummary() {
-    // "Expected" = active/open bonuses only (not cancelled, not fully closed)
-    const ACTIVE_STATUSES = ['planned','in_progress','requirements_met','bonus_posted','closing'];
-    const active = state.bonuses.filter(b => ACTIVE_STATUSES.includes(b.status));
-    // "Received" = bonus actually posted, excluding cancelled
-    const recv = state.bonuses.filter(b => b.dateBonusPosted && b.status !== 'cancelled');
-    const taxY = state.bonuses.filter(b => b.dateBonusPosted && b.status !== 'cancelled' && new Date(b.dateBonusPosted+'T00:00:00').getFullYear() === currentYear);
-    const pend = state.bonuses.filter(b => ['planned','in_progress','requirements_met'].includes(b.status));
-    const sum  = arr => arr.reduce((a,b) => a + (parseFloat(b.bonusAmount)||0), 0);
+    const sum = arr => arr.reduce((a, b) => a + (parseFloat(b.bonusAmount) || 0), 0);
+
     // Normalise person at render time — any unrecognised value falls to 'you'
     const normP = p => (p === 'spouse' || p === 'joint') ? p : 'you';
-    // Re-map active bonuses so person is always one of: you / spouse / joint
-    const activeNorm = active.map(b => ({...b, person: normP(b.person)}));
-    el('summary-expected').textContent   = currency.format(sum(activeNorm));
-    el('summary-received').textContent   = currency.format(sum(recv));
-    el('summary-tax-year').textContent   = currency.format(sum(taxY));
-    el('summary-pending-year').textContent = currency.format(sum(pend));
+
+    // ── EXPECTED: status = 'planned' only
+    // (rechurn-eligible banks are already represented as new 'planned' entries
+    //  per user decision — no special rechurn lookup needed)
+    const expected = state.bonuses
+      .filter(b => b.status === 'planned')
+      .map(b => ({...b, person: normP(b.person)}));
+
+    // ── PENDING: in_progress or requirements_met
+    const pending = state.bonuses.filter(b =>
+      b.status === 'in_progress' || b.status === 'requirements_met'
+    );
+
+    // ── RECEIVED: bonus_posted, closing_started, closed, closed_repeat
+    const RECEIVED_STATUSES = ['bonus_posted', 'closing_started', 'closed', 'closed_repeat'];
+    const recv    = state.bonuses.filter(b => RECEIVED_STATUSES.includes(b.status));
+    const recvY   = recv.filter(b =>
+      b.dateBonusPosted &&
+      new Date(b.dateBonusPosted + 'T00:00:00').getFullYear() === currentYear
+    );
+
+    // ── Top-level cards
+    el('summary-expected').textContent     = currency.format(sum(expected));
+    el('summary-pending-year').textContent = currency.format(sum(pending));
+    el('summary-received').textContent     = currency.format(sum(recv));
+    el('summary-tax-year').textContent     = currency.format(sum(recvY));
     el('summary-tax-year-label').textContent = currentYear + ' calendar year';
-    // Normalise person at render time so any legacy/corrupt values don't fall through
-    ['you','spouse','joint'].forEach(p => {
-      const pb = activeNorm.filter(b => b.person === p);
-      el('ps-'+p+'-expected').textContent = currency.format(sum(pb));
-      const open = pb.filter(b => b.dateOpened && !CLOSED_STATUSES.includes(b.status));
+
+    // ── Per-person Expected cards (You + Spouse only; joint folds into 'you' default)
+    ['you', 'spouse'].forEach(p => {
+      // For per-person: joint bonuses are excluded (not assigned to either individual)
+      const pb = expected.filter(b => b.person === p);
+      el('ps-' + p + '-expected').textContent = currency.format(sum(pb));
+      // $/day sub-label
       let total = 0, cnt = 0;
-      open.forEach(b => { const d = daysBetween(parseDate(b.dateOpened), today); if (d && d > 0 && b.bonusAmount) { total += parseFloat(b.bonusAmount)/d; cnt++; } });
-      el('ps-'+p+'-roi').textContent = cnt > 0 ? '~'+currency.format(total/cnt)+'/day avg' : '';
+      pb.filter(b => b.dateOpened).forEach(b => {
+        const d = daysBetween(parseDate(b.dateOpened), today);
+        if (d && d > 0 && b.bonusAmount) { total += parseFloat(b.bonusAmount) / d; cnt++; }
+      });
+      el('ps-' + p + '-roi').textContent = cnt > 0 ? '~' + currency.format(total / cnt) + '/day avg' : '';
     });
-    const openAll = active.filter(b => b.dateOpened && !CLOSED_STATUSES.includes(b.status));
-    let tr = 0, tc = 0;
-    openAll.forEach(b => { const d = daysBetween(parseDate(b.dateOpened), today); if (d && d > 0 && b.bonusAmount) { tr += parseFloat(b.bonusAmount)/d; tc++; } });
-    el('ps-avg-roi').textContent = tc > 0 ? currency.format(tr)+'/day' : '—';
-    el('ps-avg-roi').style.color = tc > 0 ? 'var(--accent)' : 'var(--text)';
   }
 
   // ── Pipeline ────────────────────────────────────────────────────────────
