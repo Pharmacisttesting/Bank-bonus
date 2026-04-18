@@ -1177,8 +1177,6 @@
       margin-left: auto;
     }
     .cal-close-btn:hover { color: var(--text-muted); }
-
-    /* Year/Month quick-select grid */
     .cal-year-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -2020,25 +2018,28 @@
 
   // ── Summary ────────────────────────────────────────────────────────────
   function renderSummary() {
-    const nonC = state.bonuses.filter(b => b.status !== 'cancelled');
-    const recv = state.bonuses.filter(b => b.dateBonusPosted);
-    const taxY = state.bonuses.filter(b => b.dateBonusPosted && new Date(b.dateBonusPosted).getFullYear() === currentYear);
+    // "Expected" = active/open bonuses only (not cancelled, not fully closed)
+    const ACTIVE_STATUSES = ['planned','in_progress','requirements_met','bonus_posted','closing'];
+    const active = state.bonuses.filter(b => ACTIVE_STATUSES.includes(b.status));
+    // "Received" = bonus actually posted, excluding cancelled
+    const recv = state.bonuses.filter(b => b.dateBonusPosted && b.status !== 'cancelled');
+    const taxY = state.bonuses.filter(b => b.dateBonusPosted && b.status !== 'cancelled' && new Date(b.dateBonusPosted+'T00:00:00').getFullYear() === currentYear);
     const pend = state.bonuses.filter(b => ['planned','in_progress','requirements_met'].includes(b.status));
     const sum  = arr => arr.reduce((a,b) => a + (parseFloat(b.bonusAmount)||0), 0);
-    el('summary-expected').textContent   = currency.format(sum(nonC));
+    el('summary-expected').textContent   = currency.format(sum(active));
     el('summary-received').textContent   = currency.format(sum(recv));
     el('summary-tax-year').textContent   = currency.format(sum(taxY));
     el('summary-pending-year').textContent = currency.format(sum(pend));
     el('summary-tax-year-label').textContent = currentYear + ' calendar year';
     ['you','spouse','joint'].forEach(p => {
-      const pb = nonC.filter(b => b.person === p);
+      const pb = active.filter(b => b.person === p);
       el('ps-'+p+'-expected').textContent = currency.format(sum(pb));
       const open = pb.filter(b => b.dateOpened && !CLOSED_STATUSES.includes(b.status));
       let total = 0, cnt = 0;
       open.forEach(b => { const d = daysBetween(parseDate(b.dateOpened), today); if (d && d > 0 && b.bonusAmount) { total += parseFloat(b.bonusAmount)/d; cnt++; } });
       el('ps-'+p+'-roi').textContent = cnt > 0 ? '~'+currency.format(total/cnt)+'/day avg' : '';
     });
-    const openAll = nonC.filter(b => b.dateOpened && !CLOSED_STATUSES.includes(b.status));
+    const openAll = active.filter(b => b.dateOpened && !CLOSED_STATUSES.includes(b.status));
     let tr = 0, tc = 0;
     openAll.forEach(b => { const d = daysBetween(parseDate(b.dateOpened), today); if (d && d > 0 && b.bonusAmount) { tr += parseFloat(b.bonusAmount)/d; tc++; } });
     el('ps-avg-roi').textContent = tc > 0 ? currency.format(tr)+'/day' : '—';
@@ -2862,226 +2863,103 @@
   const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
 
-  let popup = null;
-  let activeInput = null;
-  let viewYear = null;
-  let viewMonth = null;
-  let viewMode = 'days'; // 'days' | 'month-year'
+  let popup = null, activeInput = null, viewYear = null, viewMonth = null, viewMode = 'days';
 
   function todayStr() {
     const d = new Date();
-    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   }
-
   function parseInputDate(input) {
-    const v = input.value;
-    if (!v) return null;
-    const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (m) return { y: +m[1], mo: +m[2]-1, d: +m[3] };
-    return null;
+    const m = (input.value||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? { y:+m[1], mo:+m[2]-1, d:+m[3] } : null;
   }
-
   function setInputDate(input, y, mo, d) {
-    input.value = y + '-' + String(mo+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
-    input.dispatchEvent(new Event('change', {bubbles:true}));
-    input.dispatchEvent(new Event('input', {bubbles:true}));
+    input.value = y+'-'+String(mo+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    input.dispatchEvent(new Event('input',{bubbles:true}));
   }
-
   function positionPopup(btn) {
     const rect = btn.closest('.date-input-wrap').getBoundingClientRect();
-    const popW = 260, popH = 320;
-    let left = rect.left;
-    let top  = rect.bottom + 4;
-    if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
-    if (top + popH > window.innerHeight - 8) top = rect.top - popH - 4;
-    popup.style.left = left + 'px';
-    popup.style.top  = top  + 'px';
+    let left = rect.left, top = rect.bottom + 4;
+    if (left + 260 > window.innerWidth - 8) left = window.innerWidth - 268;
+    if (top + 320 > window.innerHeight - 8) top = rect.top - 324;
+    popup.style.left = left+'px'; popup.style.top = top+'px';
   }
-
   function renderDaysView() {
-    const today = todayStr();
-    const sel   = parseInputDate(activeInput);
+    const today = todayStr(), sel = parseInputDate(activeInput);
     const firstDay = new Date(viewYear, viewMonth, 1).getDay();
     const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
     const daysInPrev  = new Date(viewYear, viewMonth, 0).getDate();
-
-    let html = `
-      <div class="cal-header">
-        <button class="cal-nav" id="cal-prev" title="Previous month">&#8249;</button>
-        <span class="cal-month-label" id="cal-month-label">${MONTHS[viewMonth]} ${viewYear}</span>
-        <button class="cal-nav" id="cal-next" title="Next month">&#8250;</button>
-      </div>
-      <div class="cal-grid">
-        ${DAYS.map(d=>`<div class="cal-dow">${d}</div>`).join('')}`;
-
-    // Prev month overflow
-    for (let i = 0; i < firstDay; i++) {
-      const day = daysInPrev - firstDay + 1 + i;
-      const mo = viewMonth - 1 < 0 ? 11 : viewMonth - 1;
-      const yr = viewMonth - 1 < 0 ? viewYear - 1 : viewYear;
-      const ds = yr+'-'+String(mo+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
-      html += `<div class="cal-day other-month" data-date="${ds}">${day}</div>`;
+    let html = `<div class="cal-header">
+      <button class="cal-nav" id="cal-prev">&#8249;</button>
+      <span class="cal-month-label" id="cal-mlabel">${MONTHS[viewMonth]} ${viewYear}</span>
+      <button class="cal-nav" id="cal-next">&#8250;</button>
+    </div><div class="cal-grid">${DAYS.map(d=>`<div class="cal-dow">${d}</div>`).join('')}`;
+    for (let i=0;i<firstDay;i++) {
+      const day=daysInPrev-firstDay+1+i, mo=viewMonth-1<0?11:viewMonth-1, yr=viewMonth-1<0?viewYear-1:viewYear;
+      html+=`<div class="cal-day other-month" data-date="${yr}-${String(mo+1).padStart(2,'0')}-${String(day).padStart(2,'0')}">${day}</div>`;
     }
-
-    // Current month
-    for (let d = 1; d <= daysInMonth; d++) {
-      const ds = viewYear+'-'+String(viewMonth+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-      let cls = 'cal-day';
-      if (ds === today) cls += ' today';
-      if (sel && ds === (sel.y+'-'+String(sel.mo+1).padStart(2,'0')+'-'+String(sel.d).padStart(2,'0'))) cls += ' selected';
-      html += `<div class="${cls}" data-date="${ds}">${d}</div>`;
+    for (let d=1;d<=daysInMonth;d++) {
+      const ds=`${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      let cls='cal-day'+(ds===today?' today':'')+(sel&&ds===`${sel.y}-${String(sel.mo+1).padStart(2,'0')}-${String(sel.d).padStart(2,'0')}`?' selected':'');
+      html+=`<div class="${cls}" data-date="${ds}">${d}</div>`;
     }
-
-    // Next month overflow
-    const totalCells = firstDay + daysInMonth;
-    const remaining = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
-    for (let i = 1; i <= remaining; i++) {
-      const mo = viewMonth + 1 > 11 ? 0 : viewMonth + 1;
-      const yr = viewMonth + 1 > 11 ? viewYear + 1 : viewYear;
-      const ds = yr+'-'+String(mo+1).padStart(2,'0')+'-'+String(i).padStart(2,'0');
-      html += `<div class="cal-day other-month" data-date="${ds}">${i}</div>`;
+    const rem=(firstDay+daysInMonth)%7===0?0:7-(firstDay+daysInMonth)%7;
+    for (let i=1;i<=rem;i++) {
+      const mo=viewMonth+1>11?0:viewMonth+1, yr=viewMonth+1>11?viewYear+1:viewYear;
+      html+=`<div class="cal-day other-month" data-date="${yr}-${String(mo+1).padStart(2,'0')}-${String(i).padStart(2,'0')}">${i}</div>`;
     }
-
-    html += `</div>
-      <div class="cal-footer">
-        <button class="cal-today-btn" id="cal-today-btn">Today</button>
-        <button class="cal-clear-btn" id="cal-clear-btn">Clear</button>
-        <button class="cal-close-btn" id="cal-close-btn">✕</button>
-      </div>`;
-
-    popup.innerHTML = html;
-    popup.querySelector('#cal-prev').addEventListener('click', () => {
-      viewMonth--; if (viewMonth < 0) { viewMonth = 11; viewYear--; }
-      renderDaysView();
-    });
-    popup.querySelector('#cal-next').addEventListener('click', () => {
-      viewMonth++; if (viewMonth > 11) { viewMonth = 0; viewYear++; }
-      renderDaysView();
-    });
-    popup.querySelector('#cal-month-label').addEventListener('click', () => {
-      viewMode = 'month-year'; renderMonthYearView();
-    });
-    popup.querySelector('#cal-today-btn').addEventListener('click', () => {
-      const d = new Date();
-      setInputDate(activeInput, d.getFullYear(), d.getMonth(), d.getDate());
-      closePopup();
-    });
-    popup.querySelector('#cal-clear-btn').addEventListener('click', () => {
-      activeInput.value = '';
-      activeInput.dispatchEvent(new Event('change', {bubbles:true}));
-      closePopup();
-    });
-    popup.querySelector('#cal-close-btn').addEventListener('click', closePopup);
-
-    popup.querySelectorAll('.cal-day').forEach(cell => {
-      cell.addEventListener('click', () => {
-        const [y, mo, d] = cell.dataset.date.split('-').map(Number);
-        setInputDate(activeInput, y, mo-1, d);
-        closePopup();
-      });
-    });
+    html+=`</div><div class="cal-footer">
+      <button class="cal-today-btn" id="cal-today">Today</button>
+      <button class="cal-clear-btn" id="cal-clear">Clear</button>
+      <button class="cal-close-btn" id="cal-close">✕</button>
+    </div>`;
+    popup.innerHTML=html;
+    popup.querySelector('#cal-prev').onclick=()=>{ viewMonth--;if(viewMonth<0){viewMonth=11;viewYear--;} renderDaysView(); };
+    popup.querySelector('#cal-next').onclick=()=>{ viewMonth++;if(viewMonth>11){viewMonth=0;viewYear++;} renderDaysView(); };
+    popup.querySelector('#cal-mlabel').onclick=()=>{ viewMode='month-year'; renderMonthYearView(); };
+    popup.querySelector('#cal-today').onclick=()=>{ const d=new Date(); setInputDate(activeInput,d.getFullYear(),d.getMonth(),d.getDate()); closePopup(); };
+    popup.querySelector('#cal-clear').onclick=()=>{ activeInput.value=''; activeInput.dispatchEvent(new Event('change',{bubbles:true})); closePopup(); };
+    popup.querySelector('#cal-close').onclick=closePopup;
+    popup.querySelectorAll('.cal-day').forEach(cell=>cell.addEventListener('click',()=>{ const [y,mo,d]=cell.dataset.date.split('-').map(Number); setInputDate(activeInput,y,mo-1,d); closePopup(); }));
   }
-
   function renderMonthYearView() {
-    const curYear = new Date().getFullYear();
-    const startYear = curYear - 10;
-    const endYear   = curYear + 5;
-
-    let yearBtns = '';
-    for (let y = endYear; y >= startYear; y--) {
-      yearBtns += `<button class="cal-year-btn${y===viewYear?' active':''}" data-yr="${y}">${y}</button>`;
-    }
-
-    let monthBtns = MONTHS_SHORT.map((m,i) =>
-      `<button class="cal-month-btn${i===viewMonth?' active':''}" data-mo="${i}">${m}</button>`
-    ).join('');
-
-    popup.innerHTML = `
-      <div class="cal-header">
-        <button class="cal-nav" id="cal-back-days" title="Back to days">&#8592;</button>
-        <span style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--text);">Select Month / Year</span>
-        <button class="cal-close-btn" id="cal-close-btn2" style="margin-left:0;">✕</button>
-      </div>
-      <div class="cal-month-grid">${monthBtns}</div>
-      <div style="margin-top:10px;font-family:var(--font-mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Year</div>
-      <div class="cal-year-grid">${yearBtns}</div>`;
-
-    popup.querySelector('#cal-back-days').addEventListener('click', () => {
-      viewMode = 'days'; renderDaysView();
-    });
-    popup.querySelector('#cal-close-btn2').addEventListener('click', closePopup);
-
-    popup.querySelectorAll('.cal-month-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        viewMonth = +btn.dataset.mo;
-        viewMode = 'days'; renderDaysView();
-      });
-    });
-    popup.querySelectorAll('.cal-year-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        viewYear = +btn.dataset.yr;
-        viewMode = 'days'; renderDaysView();
-      });
-    });
-
-    // Scroll active year into view
-    setTimeout(() => {
-      const active = popup.querySelector('.cal-year-btn.active');
-      if (active) active.scrollIntoView({ block: 'center' });
-    }, 0);
+    const cur=new Date().getFullYear();
+    let yBtns=''; for(let y=cur+5;y>=cur-10;y--) yBtns+=`<button class="cal-year-btn${y===viewYear?' active':''}" data-yr="${y}">${y}</button>`;
+    const mBtns=MONTHS_SHORT.map((m,i)=>`<button class="cal-month-btn${i===viewMonth?' active':''}" data-mo="${i}">${m}</button>`).join('');
+    popup.innerHTML=`<div class="cal-header">
+      <button class="cal-nav" id="cal-back">&#8592;</button>
+      <span style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--text);">Select Month / Year</span>
+      <button class="cal-close-btn" id="cal-close2" style="margin-left:0;">✕</button>
+    </div>
+    <div class="cal-month-grid">${mBtns}</div>
+    <div style="margin-top:10px;font-family:var(--font-mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Year</div>
+    <div class="cal-year-grid">${yBtns}</div>`;
+    popup.querySelector('#cal-back').onclick=()=>{ viewMode='days'; renderDaysView(); };
+    popup.querySelector('#cal-close2').onclick=closePopup;
+    popup.querySelectorAll('.cal-month-btn').forEach(b=>b.addEventListener('click',()=>{ viewMonth=+b.dataset.mo; viewMode='days'; renderDaysView(); }));
+    popup.querySelectorAll('.cal-year-btn').forEach(b=>b.addEventListener('click',()=>{ viewYear=+b.dataset.yr; viewMode='days'; renderDaysView(); }));
+    setTimeout(()=>{ const a=popup.querySelector('.cal-year-btn.active'); if(a) a.scrollIntoView({block:'center'}); },0);
   }
-
   function openPopup(btn) {
     closePopup();
-    activeInput = document.getElementById(btn.dataset.target);
-    if (!activeInput) return;
-
-    const parsed = parseInputDate(activeInput);
-    const now = new Date();
-    viewYear  = parsed ? parsed.y  : now.getFullYear();
-    viewMonth = parsed ? parsed.mo : now.getMonth();
-    viewMode  = 'days';
-
-    popup = document.createElement('div');
-    popup.className = 'cal-popup';
+    activeInput=document.getElementById(btn.dataset.target);
+    if(!activeInput) return;
+    const p=parseInputDate(activeInput), now=new Date();
+    viewYear=p?p.y:now.getFullYear(); viewMonth=p?p.mo:now.getMonth(); viewMode='days';
+    popup=document.createElement('div'); popup.className='cal-popup';
     document.body.appendChild(popup);
-
-    renderDaysView();
-    positionPopup(btn);
+    renderDaysView(); positionPopup(btn);
   }
-
-  function closePopup() {
-    if (popup) { popup.remove(); popup = null; }
-    activeInput = null;
-  }
-
-  // Delegate click on all calendar buttons (works even for dynamically opened modals)
-  document.addEventListener('click', function(e) {
-    // Close if clicking outside
-    if (popup && !popup.contains(e.target) && !e.target.classList.contains('date-cal-btn')) {
-      closePopup(); return;
-    }
-    const btn = e.target.closest('.date-cal-btn');
-    if (!btn) return;
-    e.preventDefault();
-    e.stopPropagation();
-    // Toggle — close if same input's popup is open
-    if (popup && activeInput && activeInput.id === btn.dataset.target) {
-      closePopup();
-    } else {
-      openPopup(btn);
-    }
-  }, true);
-
-  // Reposition on scroll/resize
-  window.addEventListener('scroll', () => { if (popup && activeInput) {
-    const btn = document.querySelector(`.date-cal-btn[data-target="${activeInput.id}"]`);
-    if (btn) positionPopup(btn);
-  }}, true);
-  window.addEventListener('resize', () => { if (popup && activeInput) {
-    const btn = document.querySelector(`.date-cal-btn[data-target="${activeInput.id}"]`);
-    if (btn) positionPopup(btn);
-  }});
+  function closePopup() { if(popup){popup.remove();popup=null;} activeInput=null; }
+  document.addEventListener('click',function(e){
+    if(popup&&!popup.contains(e.target)&&!e.target.classList.contains('date-cal-btn')){closePopup();return;}
+    const btn=e.target.closest('.date-cal-btn'); if(!btn) return;
+    e.preventDefault(); e.stopPropagation();
+    if(popup&&activeInput&&activeInput.id===btn.dataset.target) closePopup(); else openPopup(btn);
+  },true);
+  window.addEventListener('scroll',()=>{if(popup&&activeInput){const b=document.querySelector(`.date-cal-btn[data-target="${activeInput.id}"]`);if(b)positionPopup(b);}},true);
+  window.addEventListener('resize',()=>{if(popup&&activeInput){const b=document.querySelector(`.date-cal-btn[data-target="${activeInput.id}"]`);if(b)positionPopup(b);}});
 })();
 </script>
 </body>
