@@ -2163,13 +2163,18 @@
     const taxY = state.bonuses.filter(b => b.dateBonusPosted && b.status !== 'cancelled' && new Date(b.dateBonusPosted+'T00:00:00').getFullYear() === currentYear);
     const pend = state.bonuses.filter(b => ['planned','in_progress','requirements_met'].includes(b.status));
     const sum  = arr => arr.reduce((a,b) => a + (parseFloat(b.bonusAmount)||0), 0);
-    el('summary-expected').textContent   = currency.format(sum(active));
+    // Normalise person at render time — any unrecognised value falls to 'you'
+    const normP = p => (p === 'spouse' || p === 'joint') ? p : 'you';
+    // Re-map active bonuses so person is always one of: you / spouse / joint
+    const activeNorm = active.map(b => ({...b, person: normP(b.person)}));
+    el('summary-expected').textContent   = currency.format(sum(activeNorm));
     el('summary-received').textContent   = currency.format(sum(recv));
     el('summary-tax-year').textContent   = currency.format(sum(taxY));
     el('summary-pending-year').textContent = currency.format(sum(pend));
     el('summary-tax-year-label').textContent = currentYear + ' calendar year';
+    // Normalise person at render time so any legacy/corrupt values don't fall through
     ['you','spouse','joint'].forEach(p => {
-      const pb = active.filter(b => b.person === p);
+      const pb = activeNorm.filter(b => b.person === p);
       el('ps-'+p+'-expected').textContent = currency.format(sum(pb));
       const open = pb.filter(b => b.dateOpened && !CLOSED_STATUSES.includes(b.status));
       let total = 0, cnt = 0;
