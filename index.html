@@ -1321,6 +1321,9 @@
     /* ── Date Picker Wrapper ── */
     .date-input-wrap { position:relative; display:flex; align-items:center; }
     .date-input-wrap input[type="date"] { width:100%; padding-right:36px; }
+    .date-input-wrap input[type="date"]::-webkit-calendar-picker-indicator { display:none !important; }
+    .date-input-wrap input[type="date"]::-webkit-inner-spin-button { display:none !important; }
+    .date-input-wrap input[type="date"] { -moz-appearance:textfield; }
     .date-cal-btn { position:absolute; right:0; top:50%; transform:translateY(-50%); width:32px; height:100%; display:flex; align-items:center; justify-content:center; background:none; border:none; border-left:1px solid var(--border); cursor:pointer; color:var(--text-muted); font-size:13px; transition:color var(--transition),background var(--transition); border-radius:0 var(--r-sm) var(--r-sm) 0; }
     .date-cal-btn:hover { color:var(--accent); background:var(--accent-soft); }
     /* ── Calendar Popup ── */
@@ -1689,46 +1692,28 @@
           <div class="field-section-header">Dates</div>
           <div>
             <label for="dateOpened">Date Opened</label>
-            <div class="date-input-wrap">
-              <div class="date-input-wrap"><input id="dateOpened" type="date"><button type="button" class="date-cal-btn" data-target="dateOpened" title="Open calendar">📅</button></div>
-              <button type="button" class="date-cal-btn" data-target="dateOpened" title="Open calendar">📅</button>
-            </div>
+            <div class="date-input-wrap"><input id="dateOpened" type="date"><button type="button" class="date-cal-btn" data-target="dateOpened" title="Open calendar">📅</button></div>
           </div>
           <div>
             <label for="offerExpiration">Offer Expiration</label>
-            <div class="date-input-wrap">
-              <div class="date-input-wrap"><input id="offerExpiration" type="date"><button type="button" class="date-cal-btn" data-target="offerExpiration" title="Open calendar">📅</button></div>
-              <button type="button" class="date-cal-btn" data-target="offerExpiration" title="Open calendar">📅</button>
-            </div>
+            <div class="date-input-wrap"><input id="offerExpiration" type="date"><button type="button" class="date-cal-btn" data-target="offerExpiration" title="Open calendar">📅</button></div>
             <div class="helper-text">When the sign-up offer expires.</div>
           </div>
           <div>
             <label for="deadline">Deadline to Meet Requirements</label>
-            <div class="date-input-wrap">
-              <div class="date-input-wrap"><input id="deadline" type="date"><button type="button" class="date-cal-btn" data-target="deadline" title="Open calendar">📅</button></div>
-              <button type="button" class="date-cal-btn" data-target="deadline" title="Open calendar">📅</button>
-            </div>
+            <div class="date-input-wrap"><input id="deadline" type="date"><button type="button" class="date-cal-btn" data-target="deadline" title="Open calendar">📅</button></div>
           </div>
           <div>
             <label for="dateRequirementsMet">Date Requirements Met</label>
-            <div class="date-input-wrap">
-              <div class="date-input-wrap"><input id="dateRequirementsMet" type="date"><button type="button" class="date-cal-btn" data-target="dateRequirementsMet" title="Open calendar">📅</button></div>
-              <button type="button" class="date-cal-btn" data-target="dateRequirementsMet" title="Open calendar">📅</button>
-            </div>
+            <div class="date-input-wrap"><input id="dateRequirementsMet" type="date"><button type="button" class="date-cal-btn" data-target="dateRequirementsMet" title="Open calendar">📅</button></div>
           </div>
           <div>
             <label for="dateBonusPosted">Date Bonus Posted</label>
-            <div class="date-input-wrap">
-              <div class="date-input-wrap"><input id="dateBonusPosted" type="date"><button type="button" class="date-cal-btn" data-target="dateBonusPosted" title="Open calendar">📅</button></div>
-              <button type="button" class="date-cal-btn" data-target="dateBonusPosted" title="Open calendar">📅</button>
-            </div>
+            <div class="date-input-wrap"><input id="dateBonusPosted" type="date"><button type="button" class="date-cal-btn" data-target="dateBonusPosted" title="Open calendar">📅</button></div>
           </div>
           <div>
             <label for="dateClosed">Date Closed</label>
-            <div class="date-input-wrap">
-              <div class="date-input-wrap"><input id="dateClosed" type="date"><button type="button" class="date-cal-btn" data-target="dateClosed" title="Open calendar">📅</button></div>
-              <button type="button" class="date-cal-btn" data-target="dateClosed" title="Open calendar">📅</button>
-            </div>
+            <div class="date-input-wrap"><input id="dateClosed" type="date"><button type="button" class="date-cal-btn" data-target="dateClosed" title="Open calendar">📅</button></div>
           </div>
           <div class="field-section-header">Requirements</div>
           <div>
@@ -1765,10 +1750,7 @@
           </div>
           <div>
             <label for="pullDate">Pull Date</label>
-            <div class="date-input-wrap">
-              <div class="date-input-wrap"><input id="pullDate" type="date"><button type="button" class="date-cal-btn" data-target="pullDate" title="Open calendar">📅</button></div>
-              <button type="button" class="date-cal-btn" data-target="pullDate" title="Open calendar">📅</button>
-            </div>
+            <div class="date-input-wrap"><input id="pullDate" type="date"><button type="button" class="date-cal-btn" data-target="pullDate" title="Open calendar">📅</button></div>
           </div>
           <div class="field-section-header">Fees</div>
           <div>
