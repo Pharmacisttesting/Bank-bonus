@@ -1990,11 +1990,12 @@
   // This ensures cooldown and rechurn eligibility are always based on the LAST time this account was churned.
   function getLastEntryForAccount(b) {
     const acctKey = (x) => (x.accountType || x.accountName || '').trim().toLowerCase();
+    // Consider ALL entries for this bank+type+person (any status) that have an anchor date
     const peers = state.bonuses.filter(p =>
       p.bank === b.bank &&
       acctKey(p) === acctKey(b) &&
       p.person === b.person &&
-      CLOSED_STATUSES.includes(p.status)
+      (p.dateBonusPosted || p.dateClosed) // must have at least one date to anchor from
     );
     if (!peers.length) return b;
     // Sort by most recent anchor date (bonus posted preferred, then closed)
@@ -2036,10 +2037,11 @@
   function computeNextEligible(b) {
     const months = b.cooldownPreset === 'lifetime' ? null : (parseInt(b.cooldownMonths) || null);
     if (!months) return null;
-    // Always anchor off the MOST RECENT entry for this bank+accountName+person
+    // Find the most recent entry for this account to anchor the cooldown date
     const last = getLastEntryForAccount(b);
     let anchor = null;
-    const ap = last.repeatAnchor || b.repeatAnchor || 'auto';
+    // Use b's repeatAnchor setting (the entry being evaluated owns the rule)
+    const ap = b.repeatAnchor || 'auto';
     if (ap === 'bonus' || (ap === 'auto' && last.dateBonusPosted)) anchor = parseDate(last.dateBonusPosted);
     else if (ap === 'closed' || (ap === 'auto' && last.dateClosed)) anchor = parseDate(last.dateClosed);
     if (!anchor) return null;
@@ -2230,8 +2232,10 @@
   // Display label: "Checking — Total Checking" or just "Checking"
   function acctLabel(b) {
     const type = b.accountType || inferAccountType(b.accountName);
-    const nick = b.accountName || '';
-    return nick ? type + ' — ' + nick : type;
+    const nick = (b.accountName || '').trim();
+    // Only show nickname if it's non-empty AND meaningfully different from the type
+    const showNick = nick && nick.toLowerCase() !== type.toLowerCase();
+    return showNick ? type + ' — ' + nick : type;
   }
 
   // ── Data migration: add accountType to old records that only have accountName ─
