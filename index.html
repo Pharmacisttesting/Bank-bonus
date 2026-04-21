@@ -1463,6 +1463,7 @@
         <span class="panel-title">Active Bonuses</span>
         <div style="display:flex;gap:8px;align-items:center;">
           <button type="button" class="btn-secondary btn-sm" id="import-csv-btn">⬆ Import CSV</button>
+          <button type="button" class="btn-secondary btn-sm" id="fix-acct-types-btn">🔧 Fix Account Types</button>
           <button type="button" class="btn-primary btn-sm" id="open-form-btn" disabled>+ Add Bonus</button>
         </div>
       </div>
@@ -1628,8 +1629,19 @@
             <input id="bank" type="text" required placeholder="e.g. Chase, BMO, SoFi">
           </div>
           <div>
-            <label for="accountName">Account Name *</label>
-            <input id="accountName" type="text" required placeholder="e.g. Smart Advantage Checking">
+            <label for="accountType">Account Type *</label>
+            <select id="accountType" required>
+              <option value="">— select type —</option>
+              <option value="Checking">Checking</option>
+              <option value="Savings">Savings</option>
+              <option value="Money Market">Money Market</option>
+              <option value="Brokerage">Brokerage</option>
+              <option value="Credit Card">Credit Card</option>
+            </select>
+          </div>
+          <div>
+            <label for="accountName">Account Nickname <span style="font-weight:400;color:var(--text-dim)">(optional)</span></label>
+            <input id="accountName" type="text" placeholder="e.g. Total Checking, Sapphire Preferred">
           </div>
           <div>
             <label for="accountLast4">Account # (last 4)</label>
@@ -1935,6 +1947,24 @@
   </div>
 </div>
 
+<!-- ── FIX ACCOUNT TYPES MODAL ──────────────────────────────────────── -->
+<div class="modal-backdrop" id="fix-acct-modal" style="display:none;">
+  <div class="modal-box" style="max-width:640px;width:100%;">
+    <div class="modal-header">
+      <span class="modal-title">🔧 Fix Account Types</span>
+      <button type="button" class="modal-close" id="fix-acct-close-btn">✕</button>
+    </div>
+    <div style="padding:0 20px 8px;font-size:12px;color:var(--text-muted);">
+      Review and correct the account type for each entry. Types are used to match rechurn history.
+    </div>
+    <div id="fix-acct-list" style="padding:0 20px 16px;max-height:60vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;"></div>
+    <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;">
+      <button type="button" class="btn-ghost btn-sm" id="fix-acct-cancel-btn">Cancel</button>
+      <button type="button" class="btn-primary btn-sm" id="fix-acct-save-btn">Save All Changes</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function() {
   const state = { bonuses: [], editingId: null, personFilter: 'all', historyYear: 'all' };
@@ -1974,18 +2004,72 @@
   function fmtDate(d) { if (!d) return '—'; return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); }
   function fmtYear(d) { return d ? new Date(d+'T00:00:00').getFullYear() : null; }
 
+  // Returns the most recent closed entry for the same bank+accountName+person (by bonus posted or closed date).
+  // This ensures cooldown and rechurn eligibility are always based on the LAST time this account was churned.
+  function getLastEntryForAccount(b) {
+    const acctKey = (x) => (x.accountType || x.accountName || '').trim().toLowerCase();
+    const peers = state.bonuses.filter(p =>
+      p.bank === b.bank &&
+      acctKey(p) === acctKey(b) &&
+      p.person === b.person &&
+      CLOSED_STATUSES.includes(p.status)
+    );
+    if (!peers.length) return b;
+    // Sort by most recent anchor date (bonus posted preferred, then closed)
+    peers.sort((x, y) => {
+      const dx = parseDate(x.dateBonusPosted || x.dateClosed);
+      const dy = parseDate(y.dateBonusPosted || y.dateClosed);
+      if (!dx && !dy) return 0;
+      if (!dx) return -1;
+      if (!dy) return 1;
+      return dy - dx; // descending — newest first
+    });
+    return peers[0];
+  }
+
+  // Returns true if there is already a newer (non-closed) active entry for the same bank+accountName+person.
+  // Used to suppress rechurn callout/badge when a new churn is already underway.
+  function hasNewerActiveEntry(b) {
+    const acctKey = (x) => (x.accountType || x.accountName || '').trim().toLowerCase();
+    const bAnchor = parseDate(b.dateBonusPosted || b.dateClosed);
+    return state.bonuses.some(p =>
+      p.id !== b.id &&
+      p.bank === b.bank &&
+      acctKey(p) === acctKey(b) &&
+      p.person === b.person &&
+      !CLOSED_STATUSES.includes(p.status) // active/in-progress/planned
+    ) || state.bonuses.some(p =>
+      p.id !== b.id &&
+      p.bank === b.bank &&
+      acctKey(p) === acctKey(b) &&
+      p.person === b.person &&
+      CLOSED_STATUSES.includes(p.status) &&
+      (() => {
+        const pAnchor = parseDate(p.dateBonusPosted || p.dateClosed);
+        return pAnchor && bAnchor && pAnchor > bAnchor; // there's a more recent closed entry
+      })()
+    );
+  }
+
   function computeNextEligible(b) {
     const months = b.cooldownPreset === 'lifetime' ? null : (parseInt(b.cooldownMonths) || null);
     if (!months) return null;
+    // Always anchor off the MOST RECENT entry for this bank+accountName+person
+    const last = getLastEntryForAccount(b);
     let anchor = null;
-    const ap = b.repeatAnchor || 'auto';
-    if (ap === 'bonus' || (ap === 'auto' && b.dateBonusPosted)) anchor = parseDate(b.dateBonusPosted);
-    else if (ap === 'closed' || (ap === 'auto' && b.dateClosed)) anchor = parseDate(b.dateClosed);
+    const ap = last.repeatAnchor || b.repeatAnchor || 'auto';
+    if (ap === 'bonus' || (ap === 'auto' && last.dateBonusPosted)) anchor = parseDate(last.dateBonusPosted);
+    else if (ap === 'closed' || (ap === 'auto' && last.dateClosed)) anchor = parseDate(last.dateClosed);
     if (!anchor) return null;
     return addMonths(anchor, months);
   }
 
-  function isRepeatReady(b) { const n = computeNextEligible(b); return n ? n <= today : false; }
+  function isRepeatReady(b) {
+    // Not eligible if a newer active churn (or a newer closed entry) already exists for this account
+    if (hasNewerActiveEntry(b)) return false;
+    const n = computeNextEligible(b);
+    return n ? n <= today : false;
+  }
 
   function isReadyToClose(b) {
     if (b.status !== 'bonus_posted' || !b.dateBonusPosted) return false;
@@ -2106,6 +2190,7 @@
         // Local has new entries Drive hasn't seen yet — merge
         const merged = [...driveData, ...localOnly];
         state.bonuses = merged;
+        migrateAccountTypes();
         setDriveStatus('✓ Synced — merged ' + localOnly.length + ' local-only entr' + (localOnly.length === 1 ? 'y' : 'ies') + ' with Drive (' + merged.length + ' total)');
         saveLocal();
         renderAll();
@@ -2113,6 +2198,7 @@
       } else {
         // Drive has everything — just use it
         state.bonuses = driveData;
+        migrateAccountTypes();
         setDriveStatus('✓ Synced from Drive — ' + driveData.length + ' entr' + (driveData.length === 1 ? 'y' : 'ies') + ' · last saved ' + new Date(modifiedTime).toLocaleTimeString());
         saveLocal();
         renderAll();
@@ -2143,6 +2229,39 @@
   function persistAll() {
     saveLocal();
     if (isDriveConnected) { clearTimeout(persistAll._timer); persistAll._timer = setTimeout(driveSave, 1500); }
+  }
+
+  // ── Account type helpers ──────────────────────────────────────────────
+  const ACCOUNT_TYPES = ['Checking','Savings','Money Market','Brokerage','Credit Card'];
+
+  // Infer account type from a free-text account name (for migration)
+  function inferAccountType(name) {
+    if (!name) return 'Checking';
+    const n = name.toLowerCase();
+    if (n.includes('credit card') || n.includes('credit')) return 'Credit Card';
+    if (n.includes('brokerage') || n.includes('invest') || n.includes('ira') || n.includes('roth')) return 'Brokerage';
+    if (n.includes('money market') || n.includes('mm ') || n.includes(' mm')) return 'Money Market';
+    if (n.includes('saving')) return 'Savings';
+    return 'Checking';
+  }
+
+  // Display label: "Checking — Total Checking" or just "Checking"
+  function acctLabel(b) {
+    const type = b.accountType || inferAccountType(b.accountName);
+    const nick = b.accountName || '';
+    return nick ? type + ' — ' + nick : type;
+  }
+
+  // ── Data migration: add accountType to old records that only have accountName ─
+  function migrateAccountTypes() {
+    let changed = false;
+    state.bonuses.forEach(b => {
+      if (!b.accountType) {
+        b.accountType = inferAccountType(b.accountName);
+        changed = true;
+      }
+    });
+    return changed;
   }
 
   // ── Label helpers ──────────────────────────────────────────────────────
@@ -2270,7 +2389,7 @@
       else if (sf === 'ready_to_close') { if (!isReadyToClose(b)) return false; }
       else if (sf === 'repeat_ready') { if (!isRepeatReady(b)) return false; }
       else if (sf !== 'all') { if (b.status !== sf) return false; }
-      if (st) { const h = (b.bank+' '+(b.accountName||'')+' '+(b.accountHolder||'')+' '+(b.notes||'')).toLowerCase(); if (!h.includes(st)) return false; }
+      if (st) { const h = (b.bank+' '+(b.accountType||'')+' '+(b.accountName||'')+' '+(b.accountHolder||'')+' '+(b.notes||'')).toLowerCase(); if (!h.includes(st)) return false; }
       return true;
     });
   }
@@ -2330,7 +2449,7 @@
           tr.innerHTML =
             '<td data-label="Bank / Account">'+
               '<div class="cell-bank">'+b.bank+(b.accountLast4?' <span class="cell-sub">···'+b.accountLast4+'</span>':'')+'</div>'+
-              '<div class="cell-sub">'+b.accountName+'</div>'+
+              '<div class="cell-sub">'+acctLabel(b)+'</div>'+
               (b.sourceUrl ? '<div style="margin-top:3px"><a href="'+b.sourceUrl+'" target="_blank" rel="noopener" class="cell-link">Source ↗</a></div>' : '')+
             '</td>'+
             '<td data-label="Person">'+personTag(b.person)+'</td>'+
@@ -2361,7 +2480,7 @@
     const closed = state.bonuses.filter(b => {
       if (!isClosedBonus(b)) return false;
       if (pf !== 'all' && b.person !== pf) return false;
-      if (st) { const h = (b.bank+' '+(b.accountName||'')).toLowerCase(); if (!h.includes(st)) return false; }
+      if (st) { const h = (b.bank+' '+(b.accountType||'')+' '+(b.accountName||'')).toLowerCase(); if (!h.includes(st)) return false; }
       return true;
     });
 
@@ -2392,7 +2511,7 @@
         tr.innerHTML =
           '<td style="padding:7px 12px;border-bottom:1px solid var(--border);font-size:12px;">'+
             '<div style="font-weight:600;color:var(--text)">'+b.bank+'</div>'+
-            '<div class="cell-sub">'+b.accountName+'</div>'+
+            '<div class="cell-sub">'+acctLabel(b)+'</div>'+
           '</td>'+
           '<td style="padding:7px 12px;border-bottom:1px solid var(--border);">'+personTag(b.person)+'</td>'+
           '<td style="padding:7px 12px;border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:12px;color:var(--accent)">'+currency.format(b.bonusAmount||0)+'</td>'+
@@ -2469,6 +2588,7 @@
               '<span class="pill '+statusPillClass(b.status)+'">'+statusLabel(b.status)+'</span>'+
             '</div>'+
             '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;display:flex;gap:14px;flex-wrap:wrap;">'+
+              '<span style="font-size:11px;font-weight:600;color:var(--text-muted)">'+acctLabel(b)+'</span>'+
               (b.dateOpened ? '<span>Opened '+fmtDate(parseDate(b.dateOpened))+'</span>' : '')+
               (b.dateBonusPosted ? '<span>Posted '+fmtDate(parseDate(b.dateBonusPosted))+'</span>' : '')+
               (b.dateClosed ? '<span>Closed '+fmtDate(parseDate(b.dateClosed))+'</span>' : '')+
@@ -2507,13 +2627,13 @@
     state.bonuses.forEach(b => {
       const dd = parseDate(b.deadline);
       const rd = parseInt(b.remindBeforeDeadlineDays) || 7;
-      if (dd) { const d = daysBetween(today, dd); if (d !== null && d >= 0 && d <= rd) items.push('⚠️ <strong>'+b.bank+' – '+b.accountName+'</strong>: requirement deadline in '+d+' day'+(d===1?'':'s')+' ('+fmtDate(dd)+')'); }
+      if (dd) { const d = daysBetween(today, dd); if (d !== null && d >= 0 && d <= rd) items.push('⚠️ <strong>'+b.bank+' – '+acctLabel(b)+'</strong>: requirement deadline in '+d+' day'+(d===1?'':'s')+' ('+fmtDate(dd)+')'); }
       const nextEl = computeNextEligible(b);
       const rr = parseInt(b.remindBeforeRepeatDays) || 30;
-      if (nextEl) { const d = daysBetween(today, nextEl); if (d !== null && d >= 0 && d <= rr) items.push('🔁 <strong>'+b.bank+' – '+b.accountName+'</strong>: eligible to repeat in '+d+' day'+(d===1?'':'s')+' ('+fmtDate(nextEl)+')'); }
+      if (nextEl) { const d = daysBetween(today, nextEl); if (d !== null && d >= 0 && d <= rr) items.push('🔁 <strong>'+b.bank+' – '+acctLabel(b)+'</strong>: eligible to repeat in '+d+' day'+(d===1?'':'s')+' ('+fmtDate(nextEl)+')'); }
       if (b.dateOpened && b.plannedLifeMonths) {
         const op = parseDate(b.dateOpened);
-        if (op) { const pc = addMonths(op, parseInt(b.plannedLifeMonths)); const rc = parseInt(b.remindBeforeCloseDays)||14; const d = daysBetween(today, pc); if (d !== null && d >= 0 && d <= rc) items.push('📅 <strong>'+b.bank+' – '+b.accountName+'</strong>: planned close in '+d+' day'+(d===1?'':'s')+' ('+fmtDate(pc)+')'); }
+        if (op) { const pc = addMonths(op, parseInt(b.plannedLifeMonths)); const rc = parseInt(b.remindBeforeCloseDays)||14; const d = daysBetween(today, pc); if (d !== null && d >= 0 && d <= rc) items.push('📅 <strong>'+b.bank+' – '+acctLabel(b)+'</strong>: planned close in '+d+' day'+(d===1?'':'s')+' ('+fmtDate(pc)+')'); }
       }
     });
     if (items.length === 0) { empty.style.display = ''; list.innerHTML = ''; }
@@ -2527,7 +2647,7 @@
 
   // ── Form fields ────────────────────────────────────────────────────────
   const formFields = [
-    'person','bank','accountName','accountLast4','accountHolder','loginLabel',
+    'person','bank','accountType','accountName','accountLast4','accountHolder','loginLabel',
     'bonusAmount','referralBonus','status','perHousehold',
     'dateOpened','offerExpiration','deadline','dateRequirementsMet','dateBonusPosted','dateClosed',
     'minBalance','minBalanceDays','ddAmount','ddCount','ddMethods','chexSystems','pullDate',
@@ -2539,7 +2659,7 @@
 
   // Fields that carry over when rechuning (terms/requirements — NOT dates or status)
   const rechurnCarryFields = [
-    'bank','accountName','accountHolder','loginLabel','perHousehold',
+    'bank','accountType','accountName','accountHolder','loginLabel','perHousehold',
     'bonusAmount','referralBonus',
     'minBalance','minBalanceDays','ddAmount','ddCount','ddMethods','chexSystems',
     'monthlyFee','etfAmount','etfDays',
@@ -2556,6 +2676,7 @@
     clonePillEl.style.display = 'none';
     formErrorEl.style.display = 'none';
     formEl.reset(); el('bonus-id').value = '';
+    el('accountType').value = '';
     el('cooldownPreset').value = '12';
     el('cooldownMonths').value = '12';
     el('repeatAnchor').value = 'closed';
@@ -2594,6 +2715,7 @@
     // Set fresh status and clear last-4 (new account number)
     el('status').value = 'planned';
     el('accountLast4').value = '';
+    if (b.accountType) el('accountType').value = b.accountType;
     // Add a note linking back to previous churn
     el('notes').value = '[Rechurn of entry from '+fmtDate(parseDate(b.dateClosed || b.dateBonusPosted))+']'+(b.notes ? '\n'+b.notes : '');
     formModalEl.style.display = 'flex';
@@ -2603,7 +2725,7 @@
 
   function deleteBonus(id) {
     const bonus = state.bonuses.find(b => b.id === id);
-    const label = bonus ? (bonus.bank + (bonus.accountName ? ' — ' + bonus.accountName : '')) : 'this entry';
+    const label = bonus ? (bonus.bank + ' — ' + acctLabel(bonus)) : 'this entry';
     el('delete-modal-label').textContent = label;
     el('delete-modal').style.display = 'flex';
     el('delete-confirm-btn').onclick = () => {
@@ -2617,10 +2739,10 @@
     e.preventDefault();
     formErrorEl.style.display = 'none';
     const bank = el('bank').value.trim();
-    const accountName = el('accountName').value.trim();
+    const accountType = el('accountType').value.trim();
     const bonusAmount = parseFloat(el('bonusAmount').value);
     if (!bank) { showFormError('Bank is required.'); return; }
-    if (!accountName) { showFormError('Account name is required.'); return; }
+    if (!accountType) { showFormError('Account type is required.'); return; }
     if (isNaN(bonusAmount) || bonusAmount < 0) { showFormError('Bonus amount must be a valid number.'); return; }
     const entry = { id: state.editingId || uid() };
     formFields.forEach(f => { const field = el(f); if (field) entry[f] = field.value; });
@@ -2654,7 +2776,7 @@
     // ── Your exact spreadsheet headers ──────────────────────────────
     'bank':                      'bank',
     'person':                    'person',
-    'type':                      'accountName',        // Brokerage / Checking
+    'type':                      'accountType',        // Checking / Savings / Brokerage …
     'doc_link':                  'sourceUrl',
     'avoid_fee':                 'feeWaiver',
     'open_date':                 'dateOpened',
@@ -2675,6 +2797,7 @@
     'tax':                       '_tax',               // stored in notes
     // ── Generic / standard app column names ─────────────────────────
     'account_name':              'accountName',
+    'account_type':              'accountType',
     'account_last4':             'accountLast4',
     'status':                    'status',
     'bonus_amount':              'bonusAmount',
@@ -2872,8 +2995,8 @@
       raw.notes = commentParts.join(' | ');
       delete raw._comment; delete raw._tax; delete raw._reqMet;
 
-      // accountName defaults to "type" column value if set, else bank name
-      if (!raw.accountName || raw.accountName === '') raw.accountName = raw.bank + ' Account';
+      // Ensure accountType is set; fall back to inference from accountName
+      if (!raw.accountType || raw.accountType === '') raw.accountType = inferAccountType(raw.accountName || '');
 
       // Infer status
       raw.status = inferStatus(raw);
@@ -2929,8 +3052,8 @@
       id: uid(),   // always fresh ID
     }));
     // Deduplicate: skip rows whose bank+accountName+dateOpened already exist
-    const existingKeys = new Set(state.bonuses.map(b => b.bank+'|'+(b.accountName||'')+'|'+(b.dateOpened||'')));
-    const fresh    = toAdd.filter(b => !existingKeys.has(b.bank+'|'+(b.accountName||'')+'|'+(b.dateOpened||'')));
+    const existingKeys = new Set(state.bonuses.map(b => b.bank+'|'+(b.accountType||b.accountName||'')+'|'+(b.dateOpened||'')));
+    const fresh    = toAdd.filter(b => !existingKeys.has(b.bank+'|'+(b.accountType||b.accountName||'')+'|'+(b.dateOpened||'')));
     const skipped  = toAdd.length - fresh.length;
 
     state.bonuses.push(...fresh);
@@ -3035,8 +3158,60 @@
   el('delete-cancel-btn').addEventListener('click', () => { el('delete-modal').style.display = 'none'; });
   el('delete-modal').addEventListener('click', e => { if (e.target === el('delete-modal')) el('delete-modal').style.display = 'none'; });
 
+  // ── Fix Account Types Modal ───────────────────────────────────────────
+  function openFixAcctTypes() {
+    const modal = el('fix-acct-modal');
+    const list  = el('fix-acct-list');
+    list.innerHTML = '';
+
+    // Sort: unmigrated (inferred) first, then alpha by bank
+    const entries = [...state.bonuses].sort((a, b) => {
+      const aInferred = !a._acctTypeMigratedByUser;
+      const bInferred = !b._acctTypeMigratedByUser;
+      if (aInferred !== bInferred) return aInferred ? -1 : 1;
+      return (a.bank||'').localeCompare(b.bank||'');
+    });
+
+    entries.forEach(b => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);';
+      const typeOptions = ACCOUNT_TYPES.map(t =>
+        '<option value="'+t+'"'+(b.accountType===t?' selected':'')+'>'+t+'</option>'
+      ).join('');
+      const confirmed = b._acctTypeMigratedByUser;
+      row.innerHTML =
+        '<div style="flex:1;min-width:0;">'+
+          '<div style="font-weight:600;font-size:13px;color:var(--text)">'+b.bank+'</div>'+
+          '<div style="font-size:11px;color:var(--text-muted)">'+(b.accountName||'')+(b.dateOpened?' · opened '+fmtDate(parseDate(b.dateOpened)):'')+'</div>'+
+        '</div>'+
+        '<select class="small-select fix-acct-select" data-id="'+b.id+'" style="min-width:130px;">'+typeOptions+'</select>'+
+        (confirmed ? '<span style="font-size:10px;color:var(--accent)">✓</span>' : '<span style="font-size:10px;color:var(--amber)">⚠ inferred</span>');
+      list.appendChild(row);
+    });
+
+    modal.style.display = 'flex';
+  }
+
+  el('fix-acct-types-btn').addEventListener('click', openFixAcctTypes);
+  el('fix-acct-close-btn').addEventListener('click',  () => { el('fix-acct-modal').style.display = 'none'; });
+  el('fix-acct-cancel-btn').addEventListener('click', () => { el('fix-acct-modal').style.display = 'none'; });
+  el('fix-acct-modal').addEventListener('click', e => { if (e.target === el('fix-acct-modal')) el('fix-acct-modal').style.display = 'none'; });
+
+  el('fix-acct-save-btn').addEventListener('click', () => {
+    document.querySelectorAll('.fix-acct-select').forEach(sel => {
+      const b = state.bonuses.find(x => x.id === sel.dataset.id);
+      if (b) {
+        b.accountType = sel.value;
+        b._acctTypeMigratedByUser = true; // mark as user-confirmed
+      }
+    });
+    persistAll(); renderAll();
+    el('fix-acct-modal').style.display = 'none';
+  });
+
   // ── Boot ──────────────────────────────────────────────────────────────
   loadLocal();
+  if (migrateAccountTypes()) saveLocal(); // one-time migration: add accountType to old records
   driveFileId    = localStorage.getItem(DRIVE_FILE_ID_KEY)    || null;
   driveFolderId  = localStorage.getItem(DRIVE_FOLDER_ID_KEY)  || null;
   renderAll();
@@ -3236,5 +3411,6 @@
 })();
 
 </script>
+
 </body>
 </html>
