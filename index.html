@@ -1376,6 +1376,7 @@
   <div class="tab-nav" id="tab-nav" style="align-items:center;">
     <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
     <button class="tab-btn" data-tab="history">History &amp; Timeline</button>
+    <button class="tab-btn" data-tab="keepers">Permanent Accounts</button>
     <div class="theme-switcher" style="margin-left:auto;">
       <span class="theme-switcher-label">Theme</span>
       <button class="theme-btn active" data-theme-pick="clean-light" title="Clean Light"></button>
@@ -1564,6 +1565,19 @@
 
   </div><!-- /#tab-dashboard -->
 
+  <!-- ══ PERMANENT ACCOUNTS TAB ═══════════════════════════════════════ -->
+  <div id="tab-keepers" style="display:none;">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Permanent Accounts</span>
+        <span class="tag tag-count" id="keepers-count-tag">0 accounts</span>
+      </div>
+      <p class="helper-text" style="margin-bottom:12px;">Accounts you plan to keep open indefinitely. No churn reminders. Bonuses still tracked in History.</p>
+      <div id="keepers-empty" style="display:none;padding:24px;text-align:center;color:var(--text-muted);font-size:13px;">No permanent accounts yet. Set an entry's Tracking Mode to "Keeper" to add it here.</div>
+      <div id="keepers-list" style="display:flex;flex-direction:column;gap:8px;padding:4px 0;"></div>
+    </div>
+  </div>
+
   <!-- ══ HISTORY TAB ════════════════════════════════════════════════ -->
   <div id="tab-history" style="display:none;">
     <div class="panel">
@@ -1657,6 +1671,15 @@
           <div>
             <label for="loginLabel">Login Label (no password)</label>
             <input id="loginLabel" type="text" placeholder="e.g. WF Checking (see 1Password)">
+          </div>
+          <div>
+            <label for="accountTrack">Tracking Mode</label>
+            <select id="accountTrack">
+              <option value="churn">Churn — open for bonus, plan to close</option>
+              <option value="keeper">Keeper — permanent account, keep open</option>
+              <option value="archived">Archived — done churning, no repeat reminders</option>
+            </select>
+            <div class="helper-text">Keeper accounts move to their own tab. Archived entries stay in history but won't show repeat alerts.</div>
           </div>
           <div class="field-section-header">Bonus &amp; Status</div>
           <div>
@@ -1990,9 +2013,10 @@
   // This ensures cooldown and rechurn eligibility are always based on the LAST time this account was churned.
   function getLastEntryForAccount(b) {
     const acctKey = (x) => (x.accountType || x.accountName || '').trim().toLowerCase();
+    const bankKey = (x) => (x.bank || '').trim().toLowerCase();
     // Consider ALL entries for this bank+type+person (any status) that have an anchor date
     const peers = state.bonuses.filter(p =>
-      p.bank === b.bank &&
+      bankKey(p) === bankKey(b) &&
       acctKey(p) === acctKey(b) &&
       p.person === b.person &&
       (p.dateBonusPosted || p.dateClosed) // must have at least one date to anchor from
@@ -2014,16 +2038,17 @@
   // Used to suppress rechurn callout/badge when a new churn is already underway.
   function hasNewerActiveEntry(b) {
     const acctKey = (x) => (x.accountType || x.accountName || '').trim().toLowerCase();
+    const bankKey = (x) => (x.bank || '').trim().toLowerCase();
     const bAnchor = parseDate(b.dateBonusPosted || b.dateClosed);
     return state.bonuses.some(p =>
       p.id !== b.id &&
-      p.bank === b.bank &&
+      bankKey(p) === bankKey(b) &&
       acctKey(p) === acctKey(b) &&
       p.person === b.person &&
       !CLOSED_STATUSES.includes(p.status) // active/in-progress/planned
     ) || state.bonuses.some(p =>
       p.id !== b.id &&
-      p.bank === b.bank &&
+      bankKey(p) === bankKey(b) &&
       acctKey(p) === acctKey(b) &&
       p.person === b.person &&
       CLOSED_STATUSES.includes(p.status) &&
@@ -2049,6 +2074,8 @@
   }
 
   function isRepeatReady(b) {
+    // Keepers and archived entries never show as repeat-ready
+    if (b.accountTrack === 'keeper' || b.accountTrack === 'archived') return false;
     // Not eligible if a newer active churn (or a newer closed entry) already exists for this account
     if (hasNewerActiveEntry(b)) return false;
     const n = computeNextEligible(b);
@@ -2056,12 +2083,28 @@
   }
 
   function isReadyToClose(b) {
-    if (b.status !== 'bonus_posted' || !b.dateBonusPosted) return false;
+    if (b.accountTrack === 'keeper' || b.accountTrack === 'archived') return false;
+    // Only applies to statuses where a bonus has been received or is expected
+    const activeStatuses = ['bonus_posted', 'requirements_met', 'in_progress'];
+    if (!activeStatuses.includes(b.status)) return false;
     const etfDays = parseInt(b.etfDays) || 0;
-    const posted = parseDate(b.dateBonusPosted);
-    if (!posted) return false;
-    const safe = new Date(posted); safe.setDate(safe.getDate() + etfDays);
+    if (!etfDays) return false;
+    // ETF hold period starts from dateOpened (when you opened the account),
+    // falling back to dateBonusPosted if dateOpened is missing
+    const anchor = parseDate(b.dateOpened || b.dateBonusPosted);
+    if (!anchor) return false;
+    const safe = new Date(anchor); safe.setDate(safe.getDate() + etfDays);
     return today >= safe;
+  }
+
+  // How many days until safe to close (negative = already past)
+  function daysUntilSafeToClose(b) {
+    const etfDays = parseInt(b.etfDays) || 0;
+    if (!etfDays) return null;
+    const anchor = parseDate(b.dateOpened || b.dateBonusPosted);
+    if (!anchor) return null;
+    const safe = new Date(anchor); safe.setDate(safe.getDate() + etfDays);
+    return daysBetween(today, safe);
   }
 
   function urgencyClass(b) {
@@ -2328,8 +2371,9 @@
     const wOut = new Date(today); wOut.setDate(wOut.getDate() + 7);
     const items = [];
     state.bonuses.forEach(b => {
+      if (b.accountTrack === 'keeper' || b.accountTrack === 'archived') return; // no reminders for keepers/archived
       if (b.deadline) { const dl = parseDate(b.deadline); if (dl && dl >= today && dl <= wOut) { const d = daysBetween(today,dl); items.push('🔴 <strong>'+b.bank+'</strong> deadline in '+d+' day'+(d===1?'':'s')+' ('+fmtDate(dl)+')'); } }
-      if (isReadyToClose(b)) items.push('✅ <strong>'+b.bank+'</strong> ready to close — bonus posted, ETF period elapsed');
+      if (isReadyToClose(b)) items.push('✅ <strong>'+b.bank+' – '+acctLabel(b)+'</strong> safe to close — '+b.etfDays+'d ETF hold elapsed (opened '+fmtDate(parseDate(b.dateOpened))+')');  
       if (isRepeatReady(b) && CLOSED_STATUSES.includes(b.status)) items.push('🔁 <strong>'+b.bank+'</strong> cooldown elapsed — eligible to repeat');
       if (b.dateOpened && b.plannedLifeMonths) {
         const op = parseDate(b.dateOpened);
@@ -2342,7 +2386,7 @@
 
   // ── Rechurn Callout ────────────────────────────────────────────────────
   function renderRechurnCallout() {
-    const eligible = state.bonuses.filter(b => isRepeatReady(b) && CLOSED_STATUSES.includes(b.status));
+    const eligible = state.bonuses.filter(b => isRepeatReady(b) && CLOSED_STATUSES.includes(b.status) && b.accountTrack !== 'keeper' && b.accountTrack !== 'archived');
     const callout = el('rechurn-callout');
     if (eligible.length === 0) { callout.style.display = 'none'; return; }
     callout.style.display = '';
@@ -2368,6 +2412,8 @@
     const st = (el('search-text').value || '').toLowerCase();
     const pf = state.personFilter;
     return state.bonuses.filter(b => {
+      // Keeper accounts never appear in the main churn table
+      if (b.accountTrack === 'keeper') return false;
       // Hide closed accounts unless filter overrides
       if (sf === 'open' || sf === 'all') { if (isClosedBonus(b)) return false; }
       if (pf !== 'all' && b.person !== pf) return false;
@@ -2424,7 +2470,16 @@
           if (b.deadline)        datesHtml += '<div style="margin-bottom:2px"><span class="date-label">DL</span> '+fmtDate(parseDate(b.deadline))+'</div>';
           if (b.dateBonusPosted) datesHtml += '<div style="margin-bottom:2px"><span class="date-label" style="color:var(--accent)">POSTED</span> '+fmtDate(parseDate(b.dateBonusPosted))+'</div>';
           if (nextEl) datesHtml += '<div style="margin-bottom:2px"><span class="date-label">REPEAT</span> '+fmtDate(nextEl)+' '+(repeatReady ? '<span class="tag tag-repeat-ready">Ready!</span>' : '')+'</div>';
-          if (readyClose) datesHtml += '<div><span class="tag tag-repeat-ready">▸ Ready to close</span></div>';
+          if (b.etfDays && (b.dateOpened || b.dateBonusPosted)) {
+            const dUntil = daysUntilSafeToClose(b);
+            if (readyClose) {
+              datesHtml += '<div><span class="tag tag-repeat-ready">▸ Ready to close</span></div>';
+            } else if (dUntil !== null && dUntil >= 0) {
+              const anchor2 = parseDate(b.dateOpened || b.dateBonusPosted);
+              const safeDate = new Date(anchor2); safeDate.setDate(safeDate.getDate() + parseInt(b.etfDays));
+              datesHtml += '<div style="margin-bottom:2px"><span class="date-label">SAFE CLOSE</span> '+fmtDate(safeDate)+(dUntil <= 30 ? ' <span style="font-size:10px;color:var(--amber)">('+dUntil+'d)</span>' : '')+'</div>';
+            }
+          }
 
           let reqHtml = '';
           if (b.minBalance) reqHtml += '<div style="font-size:11px;margin-bottom:1px">Min bal: '+currency.format(b.minBalance)+(b.minBalanceDays?' × '+b.minBalanceDays+'d':'')+'</div>';
@@ -2493,18 +2548,26 @@
         const next = computeNextEligible(b);
         const rr   = isRepeatReady(b);
         const tr   = document.createElement('tr');
-        tr.style.opacity = '0.65';
+        tr.style.opacity = b.accountTrack === 'archived' ? '0.5' : '0.65';
+        const isArchived = b.accountTrack === 'archived';
+        const rechurnBtn = isArchived
+          ? '<button class="btn-secondary btn-sm" data-rechurn="'+b.id+'">▶ Start New Churn</button>'
+          : '<button class="btn-primary btn-sm" data-rechurn="'+b.id+'">🔁 Rechurn</button>';
+        const archiveBtn = !isArchived
+          ? '<button class="btn-ghost btn-sm" data-archive="'+b.id+'" title="Silence repeat reminders">Archive</button>'
+          : '<button class="btn-ghost btn-sm" data-unarchive="'+b.id+'" title="Restore to churn tracking">Unarchive</button>';
         tr.innerHTML =
           '<td style="padding:7px 12px;border-bottom:1px solid var(--border);font-size:12px;">'+
-            '<div style="font-weight:600;color:var(--text)">'+b.bank+'</div>'+
+            '<div style="font-weight:600;color:var(--text)">'+b.bank+(isArchived?' <span style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);font-weight:400;">archived</span>':'')+'</div>'+
             '<div class="cell-sub">'+acctLabel(b)+'</div>'+
           '</td>'+
           '<td style="padding:7px 12px;border-bottom:1px solid var(--border);">'+personTag(b.person)+'</td>'+
           '<td style="padding:7px 12px;border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:12px;color:var(--accent)">'+currency.format(b.bonusAmount||0)+'</td>'+
           '<td style="padding:7px 12px;border-bottom:1px solid var(--border);font-size:11px;color:var(--text-muted)">'+fmtDate(parseDate(b.dateClosed))+'</td>'+
-          '<td style="padding:7px 12px;border-bottom:1px solid var(--border);font-size:11px;">'+(next ? fmtDate(next)+' '+(rr?'<span class="tag tag-repeat-ready">Ready!</span>':'') : '—')+'</td>'+
-          '<td style="padding:7px 12px;border-bottom:1px solid var(--border);"><div style="display:flex;gap:4px;">'+
-            '<button class="btn-primary btn-sm" data-rechurn="'+b.id+'">🔁 Rechurn</button>'+
+          '<td style="padding:7px 12px;border-bottom:1px solid var(--border);font-size:11px;">'+(isArchived ? '<span style="color:var(--text-dim)">—</span>' : (next ? fmtDate(next)+' '+(rr?'<span class="tag tag-repeat-ready">Ready!</span>':'') : '—'))+'</td>'+
+          '<td style="padding:7px 12px;border-bottom:1px solid var(--border);"><div style="display:flex;gap:4px;flex-wrap:wrap;">'+
+            rechurnBtn+
+            archiveBtn+
             '<button class="btn-secondary btn-sm" data-edit="'+b.id+'">Edit</button>'+
           '</div></td>';
         tbody.appendChild(tr);
@@ -2513,6 +2576,14 @@
 
     tbody.querySelectorAll('[data-rechurn]').forEach(btn => btn.addEventListener('click', () => openRechurn(btn.dataset.rechurn)));
     tbody.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => openEdit(btn.dataset.edit)));
+    tbody.querySelectorAll('[data-archive]').forEach(btn => btn.addEventListener('click', () => {
+      const b = state.bonuses.find(x => x.id === btn.dataset.archive);
+      if (b) { b.accountTrack = 'archived'; persistAll(); renderAll(); }
+    }));
+    tbody.querySelectorAll('[data-unarchive]').forEach(btn => btn.addEventListener('click', () => {
+      const b = state.bonuses.find(x => x.id === btn.dataset.unarchive);
+      if (b) { b.accountTrack = 'churn'; persistAll(); renderAll(); }
+    }));
   }
 
   // ── History / Timeline Tab ─────────────────────────────────────────────
@@ -2628,12 +2699,69 @@
 
   function renderAll() {
     renderSummary(); renderPipeline(); renderWeekWidget();
-    renderRechurnCallout(); renderTable(); renderReminders(); renderHistory();
+    renderRechurnCallout(); renderTable(); renderReminders(); renderHistory(); renderKeepers();
+  }
+
+  // ── Permanent Accounts Tab ─────────────────────────────────────────────
+  function renderKeepers() {
+    const keepers = state.bonuses.filter(b => b.accountTrack === 'keeper');
+    const countTag = el('keepers-count-tag');
+    const emptyEl  = el('keepers-empty');
+    const list     = el('keepers-list');
+    if (countTag) countTag.textContent = keepers.length + ' account' + (keepers.length !== 1 ? 's' : '');
+    if (!list) return;
+    list.innerHTML = '';
+    if (keepers.length === 0) { if (emptyEl) emptyEl.style.display = ''; return; }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    // Group by bank
+    const groups = {};
+    keepers.forEach(b => {
+      const key = (b.bank || '').trim();
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(b);
+    });
+
+    Object.keys(groups).sort().forEach(bank => {
+      const card = document.createElement('div');
+      card.style.cssText = 'background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px;';
+      const rows = groups[bank].map(b => {
+        const bonusHistory = state.bonuses.filter(p =>
+          (p.bank||'').trim().toLowerCase() === (b.bank||'').trim().toLowerCase() &&
+          (p.accountType||p.accountName||'').trim().toLowerCase() === (b.accountType||b.accountName||'').trim().toLowerCase() &&
+          p.person === b.person && p.dateBonusPosted
+        );
+        const totalBonus = bonusHistory.reduce((s,x) => s + (parseFloat(x.bonusAmount)||0), 0);
+        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border);flex-wrap:wrap;">'+
+          '<div style="flex:1;min-width:120px;">'+
+            '<div style="font-size:13px;font-weight:600;color:var(--text)">'+acctLabel(b)+'</div>'+
+            '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">'+personTag(b.person)+(b.dateOpened?' · Opened '+fmtDate(parseDate(b.dateOpened)):'')+'</div>'+
+          '</div>'+
+          (totalBonus > 0 ? '<div style="font-family:var(--font-mono);font-size:12px;color:var(--accent);">'+currency.format(totalBonus)+' earned</div>' : '')+
+          (bonusHistory.length > 0 ? '<div style="font-size:11px;color:var(--text-muted);">'+bonusHistory.length+' bonus'+(bonusHistory.length!==1?'es':'')+'</div>' : '')+
+          '<div style="display:flex;gap:4px;">'+
+            '<button class="btn-primary btn-sm" data-rechurn="'+b.id+'">+ New Churn</button>'+
+            '<button class="btn-secondary btn-sm" data-edit="'+b.id+'">Edit</button>'+
+            '<button class="btn-ghost btn-sm" data-unkeepe="'+b.id+'" title="Move back to churn tracking">Unkeep</button>'+
+          '</div>'+
+        '</div>';
+      }).join('');
+
+      card.innerHTML = '<div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px;">'+bank+'</div>'+rows;
+      list.appendChild(card);
+    });
+
+    list.querySelectorAll('[data-rechurn]').forEach(btn => btn.addEventListener('click', () => openRechurn(btn.dataset.rechurn)));
+    list.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => openEdit(btn.dataset.edit)));
+    list.querySelectorAll('[data-unkeepe]').forEach(btn => btn.addEventListener('click', () => {
+      const b = state.bonuses.find(x => x.id === btn.dataset.unkeepe);
+      if (b) { b.accountTrack = 'churn'; persistAll(); renderAll(); }
+    }));
   }
 
   // ── Form fields ────────────────────────────────────────────────────────
   const formFields = [
-    'person','bank','accountType','accountName','accountLast4','accountHolder','loginLabel',
+    'person','bank','accountType','accountName','accountLast4','accountHolder','loginLabel','accountTrack',
     'bonusAmount','referralBonus','status','perHousehold',
     'dateOpened','offerExpiration','deadline','dateRequirementsMet','dateBonusPosted','dateClosed',
     'minBalance','minBalanceDays','ddAmount','ddCount','ddMethods','chexSystems','pullDate',
@@ -2663,6 +2791,7 @@
     formErrorEl.style.display = 'none';
     formEl.reset(); el('bonus-id').value = '';
     el('accountType').value = '';
+    el('accountTrack').value = 'churn';
     el('cooldownPreset').value = '12';
     el('cooldownMonths').value = '12';
     el('repeatAnchor').value = 'closed';
@@ -2702,6 +2831,7 @@
     el('status').value = 'planned';
     el('accountLast4').value = '';
     if (b.accountType) el('accountType').value = b.accountType;
+    el('accountTrack').value = 'churn'; // new churn entry, not a keeper
     // Add a note linking back to previous churn
     el('notes').value = '[Rechurn of entry from '+fmtDate(parseDate(b.dateClosed || b.dateBonusPosted))+']'+(b.notes ? '\n'+b.notes : '');
     formModalEl.style.display = 'flex';
@@ -3117,6 +3247,7 @@
       btn.classList.add('active');
       el('tab-dashboard').style.display = btn.dataset.tab === 'dashboard' ? '' : 'none';
       el('tab-history').style.display   = btn.dataset.tab === 'history'   ? '' : 'none';
+      el('tab-keepers').style.display   = btn.dataset.tab === 'keepers'   ? '' : 'none';
     });
   });
 
