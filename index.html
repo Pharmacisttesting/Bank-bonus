@@ -54,33 +54,6 @@
           callback: '',
         });
         gisInited = true;
-        // Attempt silent re-auth — works if user previously granted consent
-        // prompt:'none' means no popup shown; falls back to manual connect if needed
-        setTimeout(() => {
-          try {
-            google.accounts.oauth2.initTokenClient({
-              client_id: GOOGLE_CLIENT_ID,
-              scope: GOOGLE_SCOPES,
-              prompt: 'none',
-              callback: (tokenResponse) => {
-                if (tokenResponse && tokenResponse.access_token) {
-                  gapi.client.setToken(tokenResponse);
-                  const connectBtn = document.getElementById('drive-connect-btn');
-                  if (connectBtn) {
-                    connectBtn.textContent = '⟳ Syncing…';
-                    connectBtn.disabled = true;
-                  }
-                  // Trigger Drive load via existing connectDrive flow
-                  window._silentTokenResponse = tokenResponse;
-                  const evt = new CustomEvent('drive-silent-auth', { detail: tokenResponse });
-                  window.dispatchEvent(evt);
-                }
-              }
-            }).requestAccessToken();
-          } catch(e) {
-            // Silent auth failed — user will click Connect Drive manually, that's fine
-          }
-        }, 500);
       } catch(e) {
         console.error('[Drive] GIS init failed:', e);
         const dNote = document.getElementById('diag-note');
@@ -1495,12 +1468,7 @@
         <div style="display:flex;gap:8px;align-items:center;">
           <button type="button" class="btn-secondary btn-sm" id="import-csv-btn">⬆ Import CSV</button>
           <button type="button" class="btn-secondary btn-sm" id="fix-acct-types-btn">🔧 Fix Account Types</button>
-          <span id="add-btn-wrap" style="position:relative;display:inline-block;">
-            <button type="button" class="btn-primary btn-sm" id="open-form-btn" disabled>+ Add Bonus</button>
-            <span id="add-btn-tooltip" style="display:none;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border-bright);border-radius:var(--r-sm);padding:6px 10px;font-size:11px;font-family:var(--font-mono);color:var(--text-muted);white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:100;pointer-events:none;">
-              🔗 Connect Google Drive first to add entries
-            </span>
-          </span>
+          <button type="button" class="btn-primary btn-sm" id="open-form-btn" disabled>+ Add Bonus</button>
         </div>
       </div>
       <div class="table-toolbar">
@@ -2001,46 +1969,6 @@
     </div>
   </div>
 </div>
-
-<!-- ── FOOTER ───────────────────────────────────────────────────────── -->
-<footer style="text-align:center;padding:24px 16px 32px;font-size:12px;color:var(--text-muted);font-family:var(--font-mono);">
-  Want to use this app or report an issue? &nbsp;<button id="contact-open-btn" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;font-family:var(--font-mono);text-decoration:underline;padding:0;">Get in touch →</button>
-</footer>
-
-<!-- ── CONTACT MODAL ─────────────────────────────────────────────────── -->
-<div class="modal-backdrop" id="contact-modal" style="display:none;">
-  <div class="modal-dialog" style="max-width:480px;">
-    <div class="modal-header">
-      <span class="modal-title">Contact / Feedback</span>
-      <button type="button" class="modal-close" id="contact-close-btn">✕</button>
-    </div>
-    <div class="modal-body" style="display:flex;flex-direction:column;gap:16px;">
-      <p style="margin:0;font-size:13px;color:var(--text-muted);line-height:1.6;">Want to use this app or report an issue? Send a message and I'll get back to you.</p>
-
-      <!-- Honeypot — invisible to humans, bots fill it in and get silently dropped -->
-      <input type="text" id="contact-honeypot" name="botcheck" style="display:none;" tabindex="-1" autocomplete="off">
-
-      <div>
-        <label for="contact-name">Your Name *</label>
-        <input id="contact-name" type="text" placeholder="Your name">
-      </div>
-      <div>
-        <label for="contact-email">Your Email *</label>
-        <input id="contact-email" type="email" placeholder="So I can reply">
-      </div>
-      <div>
-        <label for="contact-message">Message *</label>
-        <textarea id="contact-message" rows="5" placeholder="What's on your mind?" style="resize:vertical;"></textarea>
-      </div>
-      <div id="contact-error" style="display:none;padding:8px 12px;background:var(--red-dim);border:1px solid var(--red);border-radius:var(--r-sm);color:var(--red);font-size:12px;"></div>
-      <div id="contact-success" style="display:none;padding:12px;background:var(--accent-dim);border:1px solid var(--accent);border-radius:var(--r-sm);font-size:13px;color:var(--accent);text-align:center;">
-        ✓ Message sent — I'll get back to you soon.
-      </div>
-      <button type="button" id="contact-send-btn" class="btn-primary" style="width:100%;">Send Message</button>
-    </div>
-  </div>
-</div>
-
 
 <script>
 (function() {
@@ -3281,18 +3209,6 @@
     el('etfDays').value = '180';
   });
   openFormBtn.addEventListener('click', openAdd);
-
-  // Tooltip on disabled Add Bonus button
-  const addBtnWrap    = el('add-btn-wrap');
-  const addBtnTooltip = el('add-btn-tooltip');
-  if (addBtnWrap && addBtnTooltip) {
-    addBtnWrap.addEventListener('mouseenter', () => {
-      if (openFormBtn.disabled) addBtnTooltip.style.display = 'block';
-    });
-    addBtnWrap.addEventListener('mouseleave', () => {
-      addBtnTooltip.style.display = 'none';
-    });
-  }
   closeFormBtn.addEventListener('click', closeModal);
   cancelBtn.addEventListener('click', closeModal);
   formModalEl.addEventListener('click', e => { if (e.target === formModalEl) closeModal(); });
@@ -3309,25 +3225,6 @@
   el('filter-status').addEventListener('change', renderTable);
   el('search-text').addEventListener('input', renderTable);
   el('drive-connect-btn').addEventListener('click', connectDrive);
-
-  // Silent auto sign-in handler — fires when GIS silently gets a token on refresh
-  window.addEventListener('drive-silent-auth', async (e) => {
-    try {
-      const statusEl = el('drive-status');
-      if (statusEl) statusEl.textContent = '⟳ Auto-connecting…';
-      await driveLoad();
-      el('drive-connect-btn').textContent = '✓ Drive Connected';
-      el('drive-connect-btn').disabled = true;
-      el('open-form-btn').disabled = false;
-      if (statusEl) setDriveStatus('✓ Auto-synced from Drive');
-    } catch(err) {
-      // Silent load failed — show connect button as normal, user clicks manually
-      const statusEl = el('drive-status');
-      if (statusEl) statusEl.textContent = 'Ready — click Connect Drive to sync.';
-      el('drive-connect-btn').disabled = false;
-      el('drive-connect-btn').textContent = 'Connect Drive';
-    }
-  });
   el('drive-save-btn').addEventListener('click', driveSave);
 
   // Closed section toggle
@@ -3428,73 +3325,6 @@
     persistAll(); renderAll();
     el('fix-acct-modal').style.display = 'none';
   });
-
-
-  // ── Contact Modal ─────────────────────────────────────────────────────
-  (function() {
-    const W3F_KEY = '183f8686-bc0b-4808-a28e-12a81bb91f2a'; // Replace after signing up at web3forms.com
-
-    function openContact() {
-      el('contact-modal').style.display = 'flex';
-      el('contact-success').style.display = 'none';
-      el('contact-error').style.display = 'none';
-      el('contact-name').value = '';
-      el('contact-email').value = '';
-      el('contact-message').value = '';
-      el('contact-send-btn').disabled = false;
-      el('contact-send-btn').textContent = 'Send Message';
-    }
-    function closeContact() { el('contact-modal').style.display = 'none'; }
-
-    el('contact-open-btn').addEventListener('click', openContact);
-    el('contact-close-btn').addEventListener('click', closeContact);
-    el('contact-modal').addEventListener('click', e => { if (e.target === el('contact-modal')) closeContact(); });
-
-    el('contact-send-btn').addEventListener('click', async () => {
-      const name    = (el('contact-name').value || '').trim();
-      const email   = (el('contact-email').value || '').trim();
-      const message = (el('contact-message').value || '').trim();
-      const honeypot = el('contact-honeypot').value;
-
-      // Honeypot check — bots fill hidden fields
-      if (honeypot) return;
-
-      el('contact-error').style.display = 'none';
-      if (!name)    { el('contact-error').textContent = 'Please enter your name.';    el('contact-error').style.display = ''; return; }
-      if (!email || !email.includes('@')) { el('contact-error').textContent = 'Please enter a valid email.'; el('contact-error').style.display = ''; return; }
-      if (!message) { el('contact-error').textContent = 'Message cannot be empty.';  el('contact-error').style.display = ''; return; }
-
-      el('contact-send-btn').disabled = true;
-      el('contact-send-btn').textContent = 'Sending…';
-
-      try {
-        const res = await fetch('https://api.web3forms.com/submit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({
-            access_key: W3F_KEY,
-            name,
-            email,
-            message,
-            subject: 'Bank Bonus Tracker — Contact Form',
-            botcheck: honeypot
-          })
-        });
-        const data = await res.json();
-        if (data.success) {
-          el('contact-success').style.display = '';
-          el('contact-send-btn').style.display = 'none';
-        } else {
-          throw new Error(data.message || 'Submission failed');
-        }
-      } catch(err) {
-        el('contact-error').textContent = 'Failed to send: ' + err.message + '. Please try again.';
-        el('contact-error').style.display = '';
-        el('contact-send-btn').disabled = false;
-        el('contact-send-btn').textContent = 'Send Message';
-      }
-    });
-  })();
 
   // ── Boot ──────────────────────────────────────────────────────────────
   loadLocal();
