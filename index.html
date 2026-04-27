@@ -1599,19 +1599,11 @@
       <p class="helper-text">Auto‑saves in this browser. Connect Google Drive once and changes will auto‑sync.</p>
       <div class="drive-section">
         <button type="button" class="btn-secondary btn-sm" id="drive-connect-btn" disabled title="Waiting for Google APIs to load…">Connect Drive</button>
-        <button type="button" class="btn-secondary btn-sm" id="drive-save-btn" disabled>Save to Drive</button>
         <span class="drive-status" id="drive-status">⏳ Loading Google APIs…</span>
       </div>
       <div style="margin-top:10px;">
         <button type="button" class="btn-danger btn-sm" id="logout-open-btn-2">⏻ Logout &amp; Clear All Data</button>
         <div style="margin-top:6px;font-size:11px;color:var(--text-muted);">Disconnects Google Drive and removes all data from this browser.</div>
-      </div>
-      <!-- Live diagnostic — shows exactly why the button is grey -->
-      <div id="drive-diag" style="margin-top:10px; padding:10px 12px; background:var(--surface-3); border:1px solid var(--border); border-radius:var(--r-sm); font-family:var(--font-mono); font-size:10px; line-height:1.8; color:var(--text-muted);">
-        <div><span id="diag-gapi">⏳</span> Google API (gapi) loaded</div>
-        <div><span id="diag-gis">⏳</span> Google Identity Services (GIS) loaded</div>
-        <div><span id="diag-origin">⏳</span> Origin: <span id="diag-origin-val"></span></div>
-        <div id="diag-note" style="margin-top:6px; color:var(--amber); display:none;"></div>
       </div>
     </div>
 
@@ -2116,6 +2108,10 @@
     if (!months) return null;
     // Find the most recent entry for this account to anchor the cooldown date
     const last = getLastEntryForAccount(b);
+    // Only compute a repeat date if the anchor entry is actually closed/has a bonus date.
+    // If the current entry itself is still active (no dateBonusPosted, no dateClosed),
+    // and it IS the last entry, don't show a repeat date — it hasn't happened yet.
+    if (last.id === b.id && !b.dateBonusPosted && !b.dateClosed) return null;
     let anchor = null;
     // Use b's repeatAnchor setting (the entry being evaluated owns the rule)
     const ap = b.repeatAnchor || 'auto';
@@ -2297,7 +2293,6 @@
       isDriveConnected = true;
       el('drive-connect-btn').textContent = '✓ Drive Connected';
       el('drive-connect-btn').disabled = true;
-      el('drive-save-btn').disabled = false;
       el('open-form-btn').disabled = false;
       setDriveStatus('↻ Loading from Drive…');
       await driveLoad();
@@ -3277,7 +3272,6 @@
   el('filter-status').addEventListener('change', renderTable);
   el('search-text').addEventListener('input', renderTable);
   el('drive-connect-btn').addEventListener('click', connectDrive);
-  el('drive-save-btn').addEventListener('click', driveSave);
 
   // Closed section toggle
   el('closed-toggle-btn').addEventListener('click', () => {
