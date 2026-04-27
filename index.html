@@ -1351,6 +1351,54 @@
     .cal-year-btn:hover,.cal-month-btn:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
     .cal-year-btn.active,.cal-month-btn.active { background:var(--accent); color:var(--surface); font-weight:700; border-color:var(--accent); }
     .cal-month-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:4px; margin-top:8px; }
+
+    /* ── Add Bonus tooltip ── */
+    .add-bonus-tooltip-wrap { position:relative; display:inline-block; }
+    .add-bonus-tooltip {
+      display:none; position:absolute; bottom:calc(100% + 8px); right:0;
+      background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md);
+      padding:8px 12px; font-size:11px; color:var(--amber); font-family:var(--font-mono);
+      white-space:nowrap; box-shadow:0 4px 16px rgba(0,0,0,0.18); z-index:100;
+      letter-spacing:.01em; pointer-events:none;
+    }
+    .add-bonus-tooltip::after {
+      content:''; position:absolute; top:100%; right:16px;
+      border:6px solid transparent; border-top-color:var(--border);
+    }
+    .add-bonus-tooltip::before {
+      content:''; position:absolute; top:calc(100% - 1px); right:16px;
+      border:6px solid transparent; border-top-color:var(--surface); z-index:1;
+    }
+    /* Show tooltip on hover only when the button is disabled */
+    .add-bonus-tooltip-wrap:has(#open-form-btn:disabled):hover .add-bonus-tooltip { display:block; }
+
+    /* ── Contact modal ── */
+    #contact-modal {
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65);
+      backdrop-filter:blur(4px); z-index:9998; align-items:center; justify-content:center;
+    }
+    #contact-modal .contact-box {
+      background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg);
+      padding:28px 28px 24px; max-width:420px; width:90%;
+      box-shadow:0 24px 60px rgba(0,0,0,0.4); animation:fadeIn .18s ease both;
+    }
+    #contact-modal h2 {
+      font-family:var(--font-mono); font-size:13px; font-weight:600; color:var(--accent);
+      letter-spacing:.06em; text-transform:uppercase; margin-bottom:4px;
+    }
+    #contact-modal p.sub { font-size:12px; color:var(--text-muted); margin-bottom:18px; }
+    #contact-modal label { font-size:11px; color:var(--text-muted); display:block; margin-bottom:4px; font-family:var(--font-mono); letter-spacing:.04em; }
+    #contact-modal input, #contact-modal textarea, #contact-modal select {
+      width:100%; background:var(--surface-2); border:1px solid var(--border);
+      border-radius:var(--r-sm); padding:8px 10px; font-size:13px; color:var(--text);
+      font-family:var(--font-body); margin-bottom:12px; outline:none; transition:border-color var(--transition);
+    }
+    #contact-modal input:focus, #contact-modal textarea:focus { border-color:var(--accent); }
+    #contact-modal textarea { min-height:90px; resize:vertical; }
+    #contact-modal .contact-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:4px; }
+    #contact-modal .contact-success { display:none; text-align:center; padding:20px 0 8px; }
+    #contact-modal .contact-success .check { font-size:36px; margin-bottom:8px; }
+    #contact-modal .contact-success p { font-size:13px; color:var(--text-muted); }
   </style>
 </head>
 <body>
@@ -1364,7 +1412,9 @@
       <p class="brand-sub">
         Track requirements, deadlines &amp; payouts. Pair with
         <a href="https://www.doctorofcredit.com/best-bank-account-bonuses/" target="_blank" rel="noopener">Doctor of Credit</a>.
+        &nbsp;·&nbsp; <a href="#" id="contact-link" onclick="document.getElementById('contact-modal').style.display='flex';return false;">💬 Contact / Suggest</a>
       </p>
+      <p style="margin-top:6px;font-size:11px;color:var(--amber);font-family:var(--font-mono);letter-spacing:.03em;">🚧 Coming next &mdash; Credit Card Churn tracking</p>
     </div>
     <div class="header-tips">
       <h3>Workflow</h3>
@@ -1458,7 +1508,6 @@
       <button class="person-tab active" data-person="all">All</button>
       <button class="person-tab" data-person="you">You</button>
       <button class="person-tab" data-person="spouse">Spouse</button>
-      <button class="person-tab" data-person="joint">Joint</button>
     </div>
 
     <!-- ── MAIN TABLE PANEL (active bonuses, grouped by bank) ──── -->
@@ -1468,7 +1517,10 @@
         <div style="display:flex;gap:8px;align-items:center;">
           <button type="button" class="btn-secondary btn-sm" id="import-csv-btn">⬆ Import CSV</button>
           <button type="button" class="btn-secondary btn-sm" id="fix-acct-types-btn">🔧 Fix Account Types</button>
-          <button type="button" class="btn-primary btn-sm" id="open-form-btn" disabled>+ Add Bonus</button>
+          <span class="add-bonus-tooltip-wrap" id="add-bonus-tooltip-wrap">
+            <button type="button" class="btn-primary btn-sm" id="open-form-btn" disabled>+ Add Bonus</button>
+            <span class="add-bonus-tooltip" id="add-bonus-tooltip">Connect Google Drive first to enable adding bonuses</span>
+          </span>
         </div>
       </div>
       <div class="table-toolbar">
@@ -3443,6 +3495,51 @@
   window.addEventListener('resize',()=>{if(popup&&activeInput){const b=document.querySelector(`.date-cal-btn[data-target="${activeInput.id}"]`);if(b)positionPopup(b);}});
 })();
 
+// ══ CONTACT MODAL (Web3Forms) ════════════════════════════════════════════
+(function() {
+  const modal = document.getElementById('contact-modal');
+  if (!modal) return;
+
+  function closeModal() { modal.style.display = 'none'; }
+  modal.addEventListener('click', function(e) { if (e.target === modal) closeModal(); });
+  document.getElementById('contact-close-btn').addEventListener('click', closeModal);
+
+  document.getElementById('contact-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('contact-submit-btn');
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+    const form = e.target;
+    try {
+      const res = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          access_key: '183f8686-bc0b-4808-a28e-12a81bb91f2a',
+          name: form.querySelector('[name="name"]').value,
+          email: form.querySelector('[name="email"]').value,
+          subject: form.querySelector('[name="subject"]').value,
+          message: form.querySelector('[name="message"]').value,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        form.style.display = 'none';
+        document.getElementById('contact-success').style.display = 'block';
+        setTimeout(closeModal, 3000);
+      } else {
+        btn.disabled = false;
+        btn.textContent = 'Send';
+        alert('Something went wrong. Please try again.');
+      }
+    } catch(err) {
+      btn.disabled = false;
+      btn.textContent = 'Send';
+      alert('Network error. Please try again.');
+    }
+  });
+})();
+
 // ══ THEME SWITCHER ═══════════════════════════════════════════════════════
 (function() {
   const THEME_KEY = 'bbt-theme';
@@ -3527,6 +3624,86 @@
   window.addEventListener('resize',()=>{if(popup&&activeInput){const b=document.querySelector(`.date-cal-btn[data-target="${activeInput.id}"]`);if(b)positionPopup(b);}});
 })();
 
+</script>
+
+<!-- ══ CONTACT / SUGGEST MODAL ══════════════════════════════════════════ -->
+<div id="contact-modal">
+  <div class="contact-box">
+    <h2>💬 Contact &amp; Suggestions</h2>
+    <p class="sub">Have a feature idea or found a bug? Send a note!</p>
+    <form id="contact-form">
+      <label>Your Name</label>
+      <input type="text" name="name" placeholder="Name (optional)">
+      <label>Email <span style="color:var(--red)">*</span></label>
+      <input type="email" name="email" required placeholder="your@email.com">
+      <label>Subject</label>
+      <select name="subject">
+        <option value="Feature Request">💡 Feature Request</option>
+        <option value="Bug Report">🐛 Bug Report</option>
+        <option value="General Feedback">💬 General Feedback</option>
+        <option value="Other">Other</option>
+      </select>
+      <label>Message <span style="color:var(--red)">*</span></label>
+      <textarea name="message" required placeholder="Describe your idea or issue…"></textarea>
+      <div class="contact-actions">
+        <button type="button" class="btn-ghost btn-sm" id="contact-close-btn">Cancel</button>
+        <button type="submit" class="btn-primary btn-sm" id="contact-submit-btn">Send</button>
+      </div>
+    </form>
+    <div id="contact-success" class="contact-success">
+      <div class="check">✅</div>
+      <p>Message sent! Thanks for reaching out.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══ CONTACT MODAL (Web3Forms) ════════════════════════════════════════════
+(function() {
+  const modal = document.getElementById('contact-modal');
+  if (!modal) return;
+  function closeModal() {
+    modal.style.display = 'none';
+    document.getElementById('contact-form').style.display = '';
+    document.getElementById('contact-success').style.display = 'none';
+    document.getElementById('contact-submit-btn').disabled = false;
+    document.getElementById('contact-submit-btn').textContent = 'Send';
+    document.getElementById('contact-form').reset();
+  }
+  modal.addEventListener('click', function(e) { if (e.target === modal) closeModal(); });
+  document.getElementById('contact-close-btn').addEventListener('click', closeModal);
+  document.getElementById('contact-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('contact-submit-btn');
+    btn.disabled = true; btn.textContent = 'Sending…';
+    const form = e.target;
+    try {
+      const res = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          access_key: '183f8686-bc0b-4808-a28e-12a81bb91f2a',
+          name: form.querySelector('[name="name"]').value || 'Anonymous',
+          email: form.querySelector('[name="email"]').value,
+          subject: form.querySelector('[name="subject"]').value,
+          message: form.querySelector('[name="message"]').value,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        form.style.display = 'none';
+        document.getElementById('contact-success').style.display = 'block';
+        setTimeout(closeModal, 3200);
+      } else {
+        btn.disabled = false; btn.textContent = 'Send';
+        alert('Something went wrong. Please try again.');
+      }
+    } catch(err) {
+      btn.disabled = false; btn.textContent = 'Send';
+      alert('Network error. Please try again.');
+    }
+  });
+})();
 </script>
 
 </body>
