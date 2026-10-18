@@ -4,6 +4,11 @@ All code changes to the Bank Bonus tracker site. Data lives in Google Drive
 (`bank-bonus-tracker.json`); this file tracks code only.
 
 ## 2026-10-18
+- Added Change Log: every bonus create, update, delete, and bulk change is now
+  recorded like a history table — timestamp, action, before/after snapshot —
+  and saved to `bank-bonus-tracker-history.json` in the same Drive folder
+  (created automatically on the first logged change). New "Change Log" tab
+  shows events newest-first with search.
 - Fixed Closed section visibility: bonuses with a closed-type status
   (`closed`, `closed_repeat`, `cancelled`) but no close date were invisible in
   every view — hidden from the main table by status, excluded from the Closed
