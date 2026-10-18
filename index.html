@@ -1318,40 +1318,6 @@
     .cal-month-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
     .cal-month-btn.active { background: var(--accent); color: #0a0c0b; font-weight: 700; border-color: var(--accent); }
 
-    /* ── Date Picker Wrapper ── */
-    .date-input-wrap { position:relative; display:flex; align-items:center; }
-    .date-input-wrap input[type="date"] { width:100%; padding-right:36px; }
-    .date-input-wrap input[type="date"]::-webkit-calendar-picker-indicator { display:none !important; }
-    .date-input-wrap input[type="date"]::-webkit-inner-spin-button { display:none !important; }
-    .date-input-wrap input[type="date"] { -moz-appearance:textfield; }
-    .date-cal-btn { position:absolute; right:0; top:50%; transform:translateY(-50%); width:32px; height:100%; display:flex; align-items:center; justify-content:center; background:none; border:none; border-left:1px solid var(--border); cursor:pointer; color:var(--text-muted); font-size:13px; transition:color var(--transition),background var(--transition); border-radius:0 var(--r-sm) var(--r-sm) 0; }
-    .date-cal-btn:hover { color:var(--accent); background:var(--accent-soft); }
-    /* ── Calendar Popup ── */
-    .cal-popup { position:fixed; z-index:99999; background:var(--surface-2); border:1px solid var(--border-bright); border-radius:var(--r-md); box-shadow:0 16px 48px rgba(0,0,0,0.3),0 0 0 1px var(--accent-soft); padding:14px; width:260px; user-select:none; animation:fadeIn 0.12s ease both; }
-    .cal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
-    .cal-nav { background:none; border:1px solid var(--border); border-radius:var(--r-sm); color:var(--text-muted); cursor:pointer; font-size:13px; width:26px; height:26px; display:flex; align-items:center; justify-content:center; transition:all var(--transition); }
-    .cal-nav:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
-    .cal-month-label { font-family:var(--font-mono); font-size:11px; font-weight:600; color:var(--text); letter-spacing:0.04em; cursor:pointer; }
-    .cal-month-label:hover { color:var(--accent); }
-    .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
-    .cal-dow { font-family:var(--font-mono); font-size:8px; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-dim); text-align:center; padding:3px 0 5px; }
-    .cal-day { width:100%; aspect-ratio:1; display:flex; align-items:center; justify-content:center; border-radius:var(--r-sm); font-size:11px; cursor:pointer; color:var(--text); border:1px solid transparent; transition:all var(--transition); font-family:var(--font-mono); }
-    .cal-day:hover { background:var(--surface-3); border-color:var(--border); }
-    .cal-day.today { border-color:var(--accent); color:var(--accent); }
-    .cal-day.selected { background:var(--accent); color:var(--surface); font-weight:700; border-color:var(--accent); }
-    .cal-day.other-month { color:var(--text-dim); }
-    .cal-footer { display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:8px; border-top:1px solid var(--border); gap:6px; }
-    .cal-today-btn,.cal-clear-btn { font-family:var(--font-mono); font-size:10px; background:none; border:1px solid var(--border); border-radius:var(--r-sm); color:var(--text-muted); cursor:pointer; padding:4px 10px; transition:all var(--transition); }
-    .cal-today-btn:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
-    .cal-clear-btn:hover { border-color:var(--red); color:var(--red); background:var(--red-dim); }
-    .cal-close-btn { font-family:var(--font-mono); font-size:10px; background:none; border:none; color:var(--text-dim); cursor:pointer; padding:4px 6px; transition:all var(--transition); margin-left:auto; }
-    .cal-close-btn:hover { color:var(--text-muted); }
-    .cal-year-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:4px; max-height:200px; overflow-y:auto; }
-    .cal-year-btn,.cal-month-btn { font-family:var(--font-mono); font-size:10px; background:none; border:1px solid var(--border); border-radius:var(--r-sm); color:var(--text); cursor:pointer; padding:5px 2px; text-align:center; transition:all var(--transition); }
-    .cal-year-btn:hover,.cal-month-btn:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
-    .cal-year-btn.active,.cal-month-btn.active { background:var(--accent); color:var(--surface); font-weight:700; border-color:var(--accent); }
-    .cal-month-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:4px; margin-top:8px; }
-
     /* ── Add Bonus tooltip ── */
     .add-bonus-tooltip-wrap { position:relative; display:inline-block; }
     .add-bonus-tooltip {
@@ -1427,6 +1393,7 @@
     <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
     <button class="tab-btn" data-tab="history">History &amp; Timeline</button>
     <button class="tab-btn" data-tab="keepers">Permanent Accounts</button>
+    <button class="tab-btn" data-tab="ddguide">DD Guide</button>
     <div class="theme-switcher" style="margin-left:auto;">
       <span class="theme-switcher-label">Theme</span>
       <button class="theme-btn active" data-theme-pick="clean-light" title="Clean Light"></button>
@@ -1659,6 +1626,21 @@
     </div>
   </div>
 
+  <div id="tab-ddguide" style="display:none;">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">DD Guide — What Counted as Direct Deposit</span>
+        <span class="tag tag-count" id="ddguide-count-tag">0 banks</span>
+      </div>
+      <p class="helper-text" style="margin-bottom:12px;">Built automatically from the “DD Methods That Worked” field on your bonuses. <span class="pill pill-green">✓ Proven</span> means the bonus actually posted, so the method genuinely worked. <span class="pill pill-default">○ Reported</span> means it was logged but the bonus hasn’t posted yet.</p>
+      <div style="margin-bottom:14px;max-width:360px;">
+        <input id="ddguide-search" type="text" placeholder="Search banks…" autocomplete="off">
+      </div>
+      <div id="ddguide-list"></div>
+      <div class="empty-state" id="ddguide-empty" style="display:none;">No DD methods recorded yet. Fill in “DD Methods That Worked” when adding or editing a bonus and they’ll show up here.</div>
+    </div>
+  </div>
+
 </div><!-- /.shell -->
 
 <!-- ══ ADD/EDIT MODAL ═════════════════════════════════════════════ -->
@@ -1801,7 +1783,8 @@
           </div>
           <div class="field-full">
             <label for="ddMethods">DD Methods That Worked</label>
-            <input id="ddMethods" type="text" placeholder="e.g. Plaid/Gusto payroll, ACH from Chase">
+            <input id="ddMethods" type="text" list="ddmethods-datalist" placeholder="e.g. Plaid/Gusto payroll, ACH from Chase" autocomplete="off">
+            <datalist id="ddmethods-datalist"></datalist>
           </div>
           <div>
             <label for="chexSystems">ChexSystems / EWS Pull</label>
@@ -2043,7 +2026,7 @@
   const saveBtnLabelEl = el('save-btn-label');
 
   const CLOSED_STATUSES = ['closed','closed_repeat','cancelled'];
-  const isClosedBonus = b => CLOSED_STATUSES.includes(b.status) && b.dateClosed;
+  const isClosedBonus = b => CLOSED_STATUSES.includes(b.status);
 
   // ── Helpers ────────────────────────────────────────────────────────────
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
@@ -2446,6 +2429,7 @@
         '<div style="font-size:11px;color:var(--text-muted);margin-top:2px">Last bonus: '+currency.format(b.bonusAmount||0)+' · Cooldown ended '+fmtDate(next)+'</div>'+
         '<div style="margin-top:6px;display:flex;gap:6px;">'+
           '<button class="btn-primary btn-sm" data-rechurn="'+b.id+'">🔁 Rechurn</button>'+
+          '<button class="btn-ghost btn-sm" data-view="'+b.id+'">👁 View</button>'+
           '<button class="btn-ghost btn-sm" data-edit="'+b.id+'">Edit</button>'+
         '</div></div>';
     }).join('');
@@ -2546,6 +2530,7 @@
             '<td data-label="Key Dates" style="font-size:12px">'+(datesHtml||'—')+'</td>'+
             '<td data-label="Requirements">'+(reqHtml||'<span style="color:var(--text-dim)">—</span>')+'</td>'+
             '<td data-label="Actions"><div style="display:flex;gap:4px;flex-wrap:wrap;">'+
+              '<button type="button" class="btn-ghost btn-sm" data-view="'+b.id+'">👁 View</button>'+
               '<button type="button" class="btn-secondary btn-sm" data-edit="'+b.id+'">Edit</button>'+
               '<button type="button" class="btn-danger btn-sm" data-delete="'+b.id+'">Del</button>'+
             '</div></td>';
@@ -2615,6 +2600,7 @@
           '<td style="padding:7px 12px;border-bottom:1px solid var(--border);"><div style="display:flex;gap:4px;flex-wrap:wrap;">'+
             rechurnBtn+
             archiveBtn+
+            '<button class="btn-ghost btn-sm" data-view="'+b.id+'">👁 View</button>'+
             '<button class="btn-secondary btn-sm" data-edit="'+b.id+'">Edit</button>'+
           '</div></td>';
         tbody.appendChild(tr);
@@ -2702,6 +2688,7 @@
           '</div>'+
           '<div style="display:flex;gap:6px;align-items:flex-start;flex-shrink:0;">'+
             '<button class="btn-primary btn-sm" data-rechurn="'+b.id+'">🔁 Rechurn</button>'+
+            '<button class="btn-ghost btn-sm" data-view="'+b.id+'">👁 View</button>'+
             '<button class="btn-secondary btn-sm" data-edit="'+b.id+'">Edit</button>'+
           '</div>'+
         '</div>';
@@ -2746,7 +2733,7 @@
 
   function renderAll() {
     renderSummary(); renderPipeline(); renderWeekWidget();
-    renderRechurnCallout(); renderTable(); renderReminders(); renderHistory(); renderKeepers();
+    renderRechurnCallout(); renderTable(); renderReminders(); renderHistory(); renderKeepers(); renderDDGuide();
   }
 
   // ── Permanent Accounts Tab ─────────────────────────────────────────────
@@ -2788,6 +2775,7 @@
           (bonusHistory.length > 0 ? '<div style="font-size:11px;color:var(--text-muted);">'+bonusHistory.length+' bonus'+(bonusHistory.length!==1?'es':'')+'</div>' : '')+
           '<div style="display:flex;gap:4px;">'+
             '<button class="btn-primary btn-sm" data-rechurn="'+b.id+'">+ New Churn</button>'+
+            '<button class="btn-ghost btn-sm" data-view="'+b.id+'">👁 View</button>'+
             '<button class="btn-secondary btn-sm" data-edit="'+b.id+'">Edit</button>'+
             '<button class="btn-ghost btn-sm" data-unkeepe="'+b.id+'" title="Move back to churn tracking">Unkeep</button>'+
           '</div>'+
@@ -2804,6 +2792,94 @@
       const b = state.bonuses.find(x => x.id === btn.dataset.unkeepe);
       if (b) { b.accountTrack = 'churn'; persistAll(); renderAll(); }
     }));
+  }
+
+  // ── DD Knowledge Base ────────────────────────────────────────────────
+  // Aggregates "DD Methods That Worked" across all bonuses, grouped by bank.
+  // A method counts as "proven" when it appears on a bonus that actually posted.
+  const DD_PROVEN_STATUSES = ['bonus_posted', 'closed', 'closed_repeat'];
+  let ddGuideSearch = '';
+
+  function escHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function buildDDKnowledge() {
+    // → { bank: { methodKey: { label, proven, reported, lastUsed } } }
+    const kb = {};
+    (state.bonuses || []).forEach(b => {
+      const raw = (b.ddMethods || '').trim();
+      const bank = (b.bank || '').trim();
+      if (!raw || !bank) return;
+      const proven = DD_PROVEN_STATUSES.includes(b.status);
+      const when = b.dateBonusPosted || b.dateClosed || b.dateOpened || '';
+      raw.split(/[,;\n]+/).map(s => s.trim()).filter(Boolean).forEach(m => {
+        const key = m.toLowerCase();
+        kb[bank] = kb[bank] || {};
+        const e = kb[bank][key] || (kb[bank][key] = { label: m, proven: 0, reported: 0, lastUsed: '' });
+        if (proven) e.proven++; else e.reported++;
+        if (when && (!e.lastUsed || when > e.lastUsed)) e.lastUsed = when;
+      });
+    });
+    return kb;
+  }
+
+  function ddMethodsForBank(bank) {
+    const kb = buildDDKnowledge();
+    const name = (bank || '').trim().toLowerCase();
+    const match = Object.keys(kb).find(k => k.toLowerCase() === name);
+    if (!match) return [];
+    return Object.values(kb[match])
+      .sort((a, b) => (b.proven + b.reported) - (a.proven + a.reported));
+  }
+
+  // Autocomplete suggestions in the bonus form, based on the bank being entered
+  function updateDDDatalist() {
+    const dl = el('ddmethods-datalist');
+    if (!dl) return;
+    const bank = el('bank') ? el('bank').value : '';
+    dl.innerHTML = ddMethodsForBank(bank).map(m =>
+      '<option value="' + escHtml(m.label) + '">' +
+        (m.proven ? '✓ proven ×' + m.proven : '○ reported') +
+      '</option>').join('');
+  }
+
+  function renderDDGuide() {
+    const kb = buildDDKnowledge();
+    const banks = Object.keys(kb).sort((a, b) => a.localeCompare(b));
+    const q = ddGuideSearch.trim().toLowerCase();
+    const filtered = q ? banks.filter(b => b.toLowerCase().includes(q)) : banks;
+    const countTag = el('ddguide-count-tag');
+    const list = el('ddguide-list');
+    const empty = el('ddguide-empty');
+    if (!list) return;
+    if (countTag) countTag.textContent = filtered.length + ' bank' + (filtered.length !== 1 ? 's' : '');
+    if (filtered.length === 0) { list.innerHTML = ''; if (empty) empty.style.display = ''; return; }
+    if (empty) empty.style.display = 'none';
+    list.innerHTML = filtered.map(bank => {
+      const methods = Object.values(kb[bank])
+        .sort((a, b) => (b.proven + b.reported) - (a.proven + a.reported));
+      const totalUses = methods.reduce((s, m) => s + m.proven + m.reported, 0);
+      const rows = methods.map(m => {
+        const badge = m.proven > 0
+          ? '<span class="pill pill-green">✓ Proven ×' + m.proven + '</span>'
+          : '<span class="pill pill-default">○ Reported' + (m.reported > 1 ? ' ×' + m.reported : '') + '</span>';
+        const last = m.lastUsed
+          ? '<span style="font-size:11px;color:var(--text-muted)">last: ' + escHtml(fmtDate(parseDate(m.lastUsed))) + '</span>'
+          : '';
+        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border);flex-wrap:wrap;">' +
+          '<div style="flex:1;min-width:140px;font-size:13px;color:var(--text)">' + escHtml(m.label) + '</div>' +
+          badge + last +
+        '</div>';
+      }).join('');
+      return '<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px;margin-bottom:12px;">' +
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;">' +
+          '<span style="font-size:14px;font-weight:700;color:var(--text)">' + escHtml(bank) + '</span>' +
+          '<span class="tag tag-count">' + methods.length + ' method' + (methods.length !== 1 ? 's' : '') +
+            ' · ' + totalUses + ' use' + (totalUses !== 1 ? 's' : '') + '</span>' +
+        '</div>' + rows + '</div>';
+    }).join('');
   }
 
   // ── Form fields ────────────────────────────────────────────────────────
@@ -2831,6 +2907,7 @@
 
   function openAdd() {
     state.editingId = null;
+    state.viewMode = false;
     formTitleEl.textContent = 'Add Bank Bonus';
     saveBtnLabelEl.textContent = 'Add Bonus';
     editingPillEl.style.display = 'none';
@@ -2843,6 +2920,7 @@
     el('cooldownMonths').value = '12';
     el('repeatAnchor').value = 'closed';
     el('etfDays').value = '180';
+    updateDDDatalist();
     formModalEl.style.display = 'flex';
   }
 
@@ -2850,6 +2928,7 @@
     const b = state.bonuses.find(x => x.id === id);
     if (!b) return;
     state.editingId = id;
+    state.viewMode = false;
     formTitleEl.textContent = 'Edit Bank Bonus';
     saveBtnLabelEl.textContent = 'Save Changes';
     editingPillEl.style.display = '';
@@ -2857,6 +2936,26 @@
     formErrorEl.style.display = 'none';
     el('bonus-id').value = id;
     formFields.forEach(f => { const field = el(f); if (field) field.value = b[f] !== undefined ? b[f] : ''; });
+    updateDDDatalist();
+    formModalEl.style.display = 'flex';
+  }
+
+  // View-only mode: same modal as edit, but every field is locked and there is no save
+  function openView(id) {
+    const b = state.bonuses.find(x => x.id === id);
+    if (!b) return;
+    state.editingId = null;
+    state.viewMode = true;
+    formTitleEl.textContent = 'View — ' + (b.bank || 'Bonus');
+    editingPillEl.style.display = 'none';
+    clonePillEl.style.display = 'none';
+    formErrorEl.style.display = 'none';
+    el('bonus-id').value = id;
+    formFields.forEach(f => { const field = el(f); if (field) { field.value = b[f] !== undefined ? b[f] : ''; field.disabled = true; } });
+    el('save-btn').style.display = 'none';
+    el('reset-btn').style.display = 'none';
+    formModalEl.querySelectorAll('.date-cal-btn').forEach(btn => btn.style.display = 'none');
+    updateDDDatalist();
     formModalEl.style.display = 'flex';
   }
 
@@ -2881,10 +2980,21 @@
     el('accountTrack').value = 'churn'; // new churn entry, not a keeper
     // Add a note linking back to previous churn
     el('notes').value = '[Rechurn of entry from '+fmtDate(parseDate(b.dateClosed || b.dateBonusPosted))+']'+(b.notes ? '\n'+b.notes : '');
+    updateDDDatalist();
     formModalEl.style.display = 'flex';
   }
 
-  function closeModal() { formModalEl.style.display = 'none'; state.editingId = null; }
+  function closeModal() {
+    formModalEl.style.display = 'none';
+    state.editingId = null;
+    if (state.viewMode) {
+      state.viewMode = false;
+      formFields.forEach(f => { const field = el(f); if (field) field.disabled = false; });
+      el('save-btn').style.display = '';
+      el('reset-btn').style.display = '';
+      formModalEl.querySelectorAll('.date-cal-btn').forEach(btn => btn.style.display = '');
+    }
+  }
 
   function deleteBonus(id) {
     const bonus = state.bonuses.find(b => b.id === id);
@@ -3294,7 +3404,18 @@
       el('tab-dashboard').style.display = btn.dataset.tab === 'dashboard' ? '' : 'none';
       el('tab-history').style.display   = btn.dataset.tab === 'history'   ? '' : 'none';
       el('tab-keepers').style.display   = btn.dataset.tab === 'keepers'   ? '' : 'none';
+      el('tab-ddguide').style.display   = btn.dataset.tab === 'ddguide'   ? '' : 'none';
     });
+  });
+
+  // ── DD Guide wiring ────────────────────────────────────────────────────
+  el('ddguide-search').addEventListener('input', e => { ddGuideSearch = e.target.value; renderDDGuide(); });
+  el('bank').addEventListener('input', updateDDDatalist);
+
+  // View-only mode: one delegated listener covers every View button on the page
+  document.addEventListener('click', e => {
+    const v = e.target.closest('[data-view]');
+    if (v && v.dataset.view) openView(v.dataset.view);
   });
 
   // ── Logout modal ──────────────────────────────────────────────────────
@@ -3489,50 +3610,6 @@
   window.addEventListener('resize',()=>{if(popup&&activeInput){const b=document.querySelector(`.date-cal-btn[data-target="${activeInput.id}"]`);if(b)positionPopup(b);}});
 })();
 
-// ══ CONTACT MODAL (Web3Forms) ════════════════════════════════════════════
-(function() {
-  const modal = document.getElementById('contact-modal');
-  if (!modal) return;
-
-  function closeModal() { modal.style.display = 'none'; }
-  modal.addEventListener('click', function(e) { if (e.target === modal) closeModal(); });
-  document.getElementById('contact-close-btn').addEventListener('click', closeModal);
-
-  document.getElementById('contact-form').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const btn = document.getElementById('contact-submit-btn');
-    btn.disabled = true;
-    btn.textContent = 'Sending…';
-    const form = e.target;
-    try {
-      const res = await fetch('https://api.web3forms.com/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({
-          access_key: '183f8686-bc0b-4808-a28e-12a81bb91f2a',
-          name: form.querySelector('[name="name"]').value,
-          email: form.querySelector('[name="email"]').value,
-          subject: form.querySelector('[name="subject"]').value,
-          message: form.querySelector('[name="message"]').value,
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        form.style.display = 'none';
-        document.getElementById('contact-success').style.display = 'block';
-        setTimeout(closeModal, 3000);
-      } else {
-        btn.disabled = false;
-        btn.textContent = 'Send';
-        alert('Something went wrong. Please try again.');
-      }
-    } catch(err) {
-      btn.disabled = false;
-      btn.textContent = 'Send';
-      alert('Network error. Please try again.');
-    }
-  });
-})();
 
 // ══ THEME SWITCHER ═══════════════════════════════════════════════════════
 (function() {
@@ -3552,72 +3629,6 @@
     applyTheme(btn.dataset.themePick);
   });
 })();
-
-// ══ CALENDAR PICKER ═══════════════════════════════════════════════════════
-(function() {
-  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
-  let popup=null, activeInput=null, viewYear=null, viewMonth=null;
-
-  function todayStr() { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
-  function parseInputDate(input) { const m=(input.value||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m?{y:+m[1],mo:+m[2]-1,d:+m[3]}:null; }
-  function setInputDate(input,y,mo,d) { input.value=y+'-'+String(mo+1).padStart(2,'0')+'-'+String(d).padStart(2,'0'); input.dispatchEvent(new Event('change',{bubbles:true})); input.dispatchEvent(new Event('input',{bubbles:true})); }
-  function positionPopup(btn) { const rect=btn.closest('.date-input-wrap').getBoundingClientRect(); let left=rect.left,top=rect.bottom+4; if(left+260>window.innerWidth-8)left=window.innerWidth-268; if(top+320>window.innerHeight-8)top=rect.top-324; popup.style.left=left+'px'; popup.style.top=top+'px'; }
-
-  function renderDaysView() {
-    const today=todayStr(), sel=parseInputDate(activeInput);
-    const firstDay=new Date(viewYear,viewMonth,1).getDay();
-    const daysInMonth=new Date(viewYear,viewMonth+1,0).getDate();
-    const daysInPrev=new Date(viewYear,viewMonth,0).getDate();
-    let html=`<div class="cal-header"><button class="cal-nav" id="cal-prev">&#8249;</button><span class="cal-month-label" id="cal-mlabel">${MONTHS[viewMonth]} ${viewYear}</span><button class="cal-nav" id="cal-next">&#8250;</button></div><div class="cal-grid">${DAYS.map(d=>`<div class="cal-dow">${d}</div>`).join('')}`;
-    for(let i=0;i<firstDay;i++){const day=daysInPrev-firstDay+1+i,mo=viewMonth-1<0?11:viewMonth-1,yr=viewMonth-1<0?viewYear-1:viewYear;html+=`<div class="cal-day other-month" data-date="${yr}-${String(mo+1).padStart(2,'0')}-${String(day).padStart(2,'0')}">${day}</div>`;}
-    for(let d=1;d<=daysInMonth;d++){const ds=`${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;let cls='cal-day'+(ds===today?' today':'')+(sel&&ds===`${sel.y}-${String(sel.mo+1).padStart(2,'0')}-${String(sel.d).padStart(2,'0')}`?' selected':'');html+=`<div class="${cls}" data-date="${ds}">${d}</div>`;}
-    const rem=(firstDay+daysInMonth)%7===0?0:7-(firstDay+daysInMonth)%7;
-    for(let i=1;i<=rem;i++){const mo=viewMonth+1>11?0:viewMonth+1,yr=viewMonth+1>11?viewYear+1:viewYear;html+=`<div class="cal-day other-month" data-date="${yr}-${String(mo+1).padStart(2,'0')}-${String(i).padStart(2,'0')}">${i}</div>`;}
-    html+=`</div><div class="cal-footer"><button class="cal-today-btn" id="cal-today">Today</button><button class="cal-clear-btn" id="cal-clear">Clear</button><button class="cal-close-btn" id="cal-close">✕</button></div>`;
-    popup.innerHTML=html;
-    popup.querySelector('#cal-prev').onclick=()=>{viewMonth--;if(viewMonth<0){viewMonth=11;viewYear--;}renderDaysView();};
-    popup.querySelector('#cal-next').onclick=()=>{viewMonth++;if(viewMonth>11){viewMonth=0;viewYear++;}renderDaysView();};
-    popup.querySelector('#cal-mlabel').onclick=()=>renderMonthYearView();
-    popup.querySelector('#cal-today').onclick=()=>{const d=new Date();setInputDate(activeInput,d.getFullYear(),d.getMonth(),d.getDate());closePopup();};
-    popup.querySelector('#cal-clear').onclick=()=>{activeInput.value='';activeInput.dispatchEvent(new Event('change',{bubbles:true}));closePopup();};
-    popup.querySelector('#cal-close').onclick=closePopup;
-    popup.querySelectorAll('.cal-day').forEach(cell=>cell.addEventListener('click',()=>{const[y,mo,d]=cell.dataset.date.split('-').map(Number);setInputDate(activeInput,y,mo-1,d);closePopup();}));
-  }
-
-  function renderMonthYearView() {
-    const cur=new Date().getFullYear();
-    let yBtns='';for(let y=cur+5;y>=cur-10;y--)yBtns+=`<button class="cal-year-btn${y===viewYear?' active':''}" data-yr="${y}">${y}</button>`;
-    const mBtns=MONTHS_SHORT.map((m,i)=>`<button class="cal-month-btn${i===viewMonth?' active':''}" data-mo="${i}">${m}</button>`).join('');
-    popup.innerHTML=`<div class="cal-header"><button class="cal-nav" id="cal-back">&#8592;</button><span style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--text);">Select Month / Year</span><button class="cal-close-btn" id="cal-close2" style="margin-left:0;">✕</button></div><div class="cal-month-grid">${mBtns}</div><div style="margin-top:10px;font-family:var(--font-mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Year</div><div class="cal-year-grid">${yBtns}</div>`;
-    popup.querySelector('#cal-back').onclick=renderDaysView;
-    popup.querySelector('#cal-close2').onclick=closePopup;
-    popup.querySelectorAll('.cal-month-btn').forEach(b=>b.addEventListener('click',()=>{viewMonth=+b.dataset.mo;renderDaysView();}));
-    popup.querySelectorAll('.cal-year-btn').forEach(b=>b.addEventListener('click',()=>{viewYear=+b.dataset.yr;renderDaysView();}));
-    setTimeout(()=>{const a=popup.querySelector('.cal-year-btn.active');if(a)a.scrollIntoView({block:'center'});},0);
-  }
-
-  function openPopup(btn) {
-    closePopup();
-    activeInput=document.getElementById(btn.dataset.target);
-    if(!activeInput)return;
-    const p=parseInputDate(activeInput),now=new Date();
-    viewYear=p?p.y:now.getFullYear();viewMonth=p?p.mo:now.getMonth();
-    popup=document.createElement('div');popup.className='cal-popup';
-    document.body.appendChild(popup);renderDaysView();positionPopup(btn);
-  }
-  function closePopup(){if(popup){popup.remove();popup=null;}activeInput=null;}
-  document.addEventListener('click',function(e){
-    if(popup&&!popup.contains(e.target)&&!e.target.classList.contains('date-cal-btn')){closePopup();return;}
-    const btn=e.target.closest('.date-cal-btn');if(!btn)return;
-    e.preventDefault();e.stopPropagation();
-    if(popup&&activeInput&&activeInput.id===btn.dataset.target)closePopup();else openPopup(btn);
-  },true);
-  window.addEventListener('scroll',()=>{if(popup&&activeInput){const b=document.querySelector(`.date-cal-btn[data-target="${activeInput.id}"]`);if(b)positionPopup(b);}},true);
-  window.addEventListener('resize',()=>{if(popup&&activeInput){const b=document.querySelector(`.date-cal-btn[data-target="${activeInput.id}"]`);if(b)positionPopup(b);}});
-})();
-
 </script>
 
 <!-- ══ CONTACT / SUGGEST MODAL ══════════════════════════════════════════ -->
