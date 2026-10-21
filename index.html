@@ -1473,6 +1473,7 @@
         <div class="summary-label">Received This Year</div>
         <div class="summary-value" id="summary-tax-year">$0</div>
         <div class="summary-sub" id="summary-tax-year-label">Current calendar year</div>
+        <button type="button" class="btn-ghost btn-sm" id="tax-export-btn" style="margin-top:8px;">🧾 Tax Export</button>
       </div>
       <div class="summary-card">
         <div class="summary-label">Received (All Time)</div>
@@ -1953,6 +1954,28 @@
         </div>
         <div id="form-error" class="error-text" style="display:none;"></div>
       </form>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TAX EXPORT MODAL ════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="tax-modal" style="display:none;">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <span class="modal-title">🧾 Tax Export — bonuses by year posted</span>
+      <button type="button" class="btn-ghost btn-sm" id="tax-close-btn">✕ Close</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+        <label for="tax-year-select" style="font-size:12px;color:var(--text-muted);">Tax year</label>
+        <select id="tax-year-select" class="small-select"></select>
+        <span class="helper-text">A bonus is taxed in the year it posted.</span>
+      </div>
+      <div id="tax-table-wrap"></div>
+      <div class="empty-state" id="tax-empty" style="display:none;">No bonuses posted in this year.</div>
+      <div style="display:flex;gap:6px;margin-top:14px;">
+        <button type="button" class="btn-primary btn-sm" id="tax-download-btn">⬇ Download CSV</button>
+      </div>
     </div>
   </div>
 </div>
@@ -2682,7 +2705,7 @@
           if (b.dateOpened)      datesHtml += '<div style="margin-bottom:2px"><span class="date-label">OPENED</span> '+fmtDate(parseDate(b.dateOpened))+'</div>';
           if (b.deadline)        datesHtml += '<div style="margin-bottom:2px"><span class="date-label">DL</span> '+fmtDate(parseDate(b.deadline))+'</div>';
           if (b.dateBonusPosted) datesHtml += '<div style="margin-bottom:2px"><span class="date-label" style="color:var(--accent)">POSTED</span> '+fmtDate(parseDate(b.dateBonusPosted))+'</div>';
-          if (nextEl) datesHtml += '<div style="margin-bottom:2px"><span class="date-label">REPEAT</span> '+fmtDate(nextEl)+' '+(repeatReady ? '<span class="tag tag-repeat-ready">Ready!</span>' : '')+'</div>';
+          if (nextEl && !hideRepeatDate(b, nextEl)) datesHtml += '<div style="margin-bottom:2px"><span class="date-label">REPEAT</span> '+fmtDate(nextEl)+' '+(repeatReady ? '<span class="tag tag-repeat-ready">Ready!</span>' : '')+'</div>';
           if (b.etfDays && (b.dateOpened || b.dateBonusPosted)) {
             const dUntil = daysUntilSafeToClose(b);
             if (readyClose) {
@@ -2696,7 +2719,7 @@
 
           let reqHtml = '';
           if (b.minBalance) reqHtml += '<div style="font-size:11px;margin-bottom:1px">Min bal: '+currency.format(b.minBalance)+(b.minBalanceDays?' × '+escHtml(b.minBalanceDays)+'d':'')+'</div>';
-          if (b.ddAmount)   reqHtml += '<div style="font-size:11px;margin-bottom:1px">DD: '+currency.format(b.ddAmount)+(b.ddCount?' × '+escHtml(b.ddCount):'')+'</div>';
+          if (b.ddAmount)   reqHtml += '<div style="font-size:11px;margin-bottom:1px">DD: '+currency.format(b.ddAmount)+(b.ddCount?' × '+escHtml(b.ddCount):'')+'</div>' + ddProgressHtml(b);
           if (b.etfAmount)  reqHtml += '<div style="font-size:11px;margin-bottom:1px">ETF: '+currency.format(b.etfAmount)+(b.etfDays?' (hold '+escHtml(b.etfDays)+'d)':'')+'</div>';
           if (b.requirements) reqHtml += '<div class="cell-notes" title="'+escHtml(b.requirements)+'">'+escHtml(b.requirements)+'</div>';
 
@@ -2866,7 +2889,7 @@
               (b.dateOpened ? '<span>Opened '+fmtDate(parseDate(b.dateOpened))+'</span>' : '')+
               (b.dateBonusPosted ? '<span>Posted '+fmtDate(parseDate(b.dateBonusPosted))+'</span>' : '')+
               (b.dateClosed ? '<span>Closed '+fmtDate(parseDate(b.dateClosed))+'</span>' : '')+
-              (next ? '<span>Repeat eligible '+fmtDate(next)+(rr?' <span class="tag tag-repeat-ready">Now!</span>':'')+'</span>' : '')+
+              (next && !(next < today && hasNewerActiveEntry(b)) ? '<span>Repeat eligible '+fmtDate(next)+(rr?' <span class="tag tag-repeat-ready">Now!</span>':'')+'</span>' : '')+
             '</div>'+
             (b.requirements ? '<div style="font-size:11px;color:var(--text-muted);margin-top:3px;font-style:italic">'+escHtml(b.requirements)+'</div>' : '')+
           '</div>'+
@@ -2943,7 +2966,7 @@
     }[a] || '<span class="pill pill-default">' + escHtml(a) + '</span>');
     const diffSummary = e => {
       if (e.action === 'update' && e.before && e.after) {
-        const keys = Object.keys(e.after).filter(k => k !== 'id' && String(e.before[k] ?? '') !== String(e.after[k] ?? ''));
+        const keys = Object.keys(e.after).filter(k => k !== 'id' && JSON.stringify(e.before[k] ?? '') !== JSON.stringify(e.after[k] ?? ''));
         return keys.length ? keys.map(k => '<span style="font-family:var(--font-mono);font-size:11px;">' + escHtml(k) + '</span>').join(', ') : 'no field changes';
       }
       if (e.action === 'bulk_update' && e.before && e.before.ids) return e.before.ids.length + ' records';
@@ -2975,7 +2998,7 @@
     cooldownMonths:'Cooldown (months)', repeatAnchor:'Repeat Rule Anchor', plannedLifeMonths:'Planned Life (months)',
     remindBeforeDeadlineDays:'Remind Before Deadline (days)', remindBeforeRepeatDays:'Remind Before Repeat (days)',
     remindBeforeCloseDays:'Remind Before Close (days)', requirements:'Requirements', feeWaiver:'Fee Waiver Details',
-    eligibilityNotes:'Eligibility / State Notes', sourceUrl:'Source URL', notes:'Notes'
+    eligibilityNotes:'Eligibility / State Notes', sourceUrl:'Source URL', notes:'Notes', ddLog:'DD Log'
   };
   const DATE_FIELDS = ['dateOpened','offerExpiration','deadline','dateRequirementsMet','dateBonusPosted','dateClosed','pullDate'];
   const MONEY_FIELDS = ['bonusAmount','referralBonus','minBalance','ddAmount','monthlyFee','etfAmount'];
@@ -2983,6 +3006,7 @@
 
   function fmtFieldValue(field, v) {
     if (v === undefined || v === null || String(v).trim() === '') return '—';
+    if (Array.isArray(v)) { const tot = v.reduce((t, e) => t + (parseFloat(e && e.amount) || 0), 0); return v.length + ' posted · ' + currency.format(tot); }
     if (DATE_FIELDS.includes(field)) { const d = parseDate(v); return d ? fmtDate(d) : escHtml(String(v)); }
     if (MONEY_FIELDS.includes(field)) { const n = parseFloat(v); return isNaN(n) ? escHtml(String(v)) : currency.format(n); }
     if (field === 'status') return statusLabel(v); // statusLabel self-escapes unknown values
@@ -3024,7 +3048,7 @@
       const titles = { create:'Created', update:'Updated', delete:'Deleted' };
       let detail = '';
       if (e.action === 'update' && e.before && e.after) {
-        const keys = Object.keys(e.after).filter(k => k !== 'id' && String(e.before[k] ?? '') !== String(e.after[k] ?? ''));
+        const keys = Object.keys(e.after).filter(k => k !== 'id' && JSON.stringify(e.before[k] ?? '') !== JSON.stringify(e.after[k] ?? ''));
         detail = keys.length ? keys.slice(0, 10).map(k =>
           '<div><span class="hist-field">' + escHtml(FIELD_LABELS[k] || k) + ':</span> ' +
           '<span class="hist-old">' + fmtFieldValue(k, e.before[k]) + '</span> → ' +
@@ -3155,6 +3179,212 @@
     if (searchEl) searchEl.value = changeLogSearch;
     renderChangeLog();
   });
+
+  // ── REPEAT date visibility ──────────────────────────────────────────
+  // A repeat date computed from a PREVIOUS churn is noise on an account
+  // that has already been (re)opened — hide it when the date is in the
+  // past and this account is open. Future dates and closed accounts
+  // (where "Ready!" drives the next churn) are unaffected.
+  function hideRepeatDate(b, nextEl) {
+    return !!nextEl && nextEl < today && !!b.dateOpened && !isClosedBonus(b);
+  }
+
+  // ── DD Progress Log ───────────────────────────────────────────────────
+  // b.ddLog = [{date:'YYYY-MM-DD', amount:Number, method:String}] — DDs
+  // that actually posted, stored inside the bonus record in Drive.
+  // A DD "counts" when its amount >= the required per-DD amount (same
+  // interpretation as the table's "DD: $X × N" requirement line).
+  // NOTE: never mutate the ddLog array in place — always assign a new
+  // array, so Change Log before/after snapshots stay accurate.
+  function localTodayStr() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function ddProgress(b) {
+    const entries = Array.isArray(b.ddLog) ? b.ddLog : [];
+    const perDD = parseFloat(b.ddAmount) || 0;
+    const targetCount = parseInt(b.ddCount) || (perDD ? 1 : 0);
+    const targetTotal = perDD * targetCount;
+    const totalPosted = entries.reduce((t, e) => t + (parseFloat(e && e.amount) || 0), 0);
+    const qualifying = perDD ? entries.filter(e => (parseFloat(e && e.amount) || 0) >= perDD).length : entries.length;
+    const hasReq = perDD > 0;
+    const met = hasReq && qualifying >= targetCount && totalPosted >= targetTotal;
+    const pct = !hasReq ? (entries.length ? 100 : 0)
+      : Math.max(0, Math.min(100, targetCount ? (qualifying / targetCount) * 100 : (targetTotal ? (totalPosted / targetTotal) * 100 : 0)));
+    return { entries, perDD, targetCount, targetTotal, totalPosted, qualifying, hasReq, met, pct };
+  }
+
+  // Compact progress for the main table's Requirements cell (active bonuses only)
+  function ddProgressHtml(b) {
+    const pr = ddProgress(b);
+    if (!pr.hasReq) return '';
+    if (!['planned', 'in_progress', 'requirements_met'].includes(b.status)) return '';
+    const bar = '<div style="height:4px;background:var(--surface-3);border-radius:2px;margin-top:3px;max-width:140px;">' +
+      '<div style="height:4px;border-radius:2px;background:var(--accent);width:' + Math.round(pr.pct) + '%"></div></div>';
+    const txt = pr.met
+      ? '<span class="tag tag-repeat-ready">✓ DD met</span>'
+      : '<span>Posted ' + pr.qualifying + ' of ' + pr.targetCount + ' · ' + currency.format(pr.totalPosted) + ' of ' + currency.format(pr.targetTotal) + '</span>';
+    return '<div style="font-size:11px;margin-top:2px;">' + txt + bar + '</div>';
+  }
+
+  function ddLogSectionHtml(b) {
+    const pr = ddProgress(b);
+    if (!pr.hasReq && pr.entries.length === 0) return '';
+    const inputStyle = 'padding:7px 9px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text);font-size:12px;';
+    const methodOptions = [];
+    try {
+      ddMethodsForBank(b.bank).forEach(m => { if (!methodOptions.includes(m.label)) methodOptions.push(m.label); });
+      (b.ddMethods || '').split(/[,;\n]+/).map(x => x.trim()).filter(Boolean).forEach(m => { if (!methodOptions.includes(m)) methodOptions.push(m); });
+    } catch (e) {}
+    const entryRows = pr.entries.map((e, i) =>
+      '<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;">' +
+        '<span style="min-width:86px;">' + fmtDate(parseDate(e.date)) + '</span>' +
+        '<span style="font-family:var(--font-mono);font-weight:600;color:var(--accent);min-width:70px;">' + currency.format(parseFloat(e.amount) || 0) + '</span>' +
+        '<span style="flex:1;color:var(--text-muted);">' + escHtml(e.method || '') + '</span>' +
+        '<button type="button" class="btn-ghost btn-sm" data-ddlog-del="' + i + '" title="Remove this DD">✕</button>' +
+      '</div>').join('');
+    const progressLine = pr.hasReq
+      ? '<div style="font-size:12px;margin-bottom:6px;">Posted <strong>' + pr.qualifying + ' of ' + pr.targetCount + '</strong> · ' +
+        '<strong>' + currency.format(pr.totalPosted) + '</strong> of ' + currency.format(pr.targetTotal) +
+        (pr.met ? ' &nbsp;<span class="tag tag-repeat-ready">✓ DD met</span>' : '') + '</div>' +
+        '<div style="height:5px;background:var(--surface-3);border-radius:3px;max-width:280px;margin-bottom:10px;">' +
+        '<div style="height:5px;border-radius:3px;background:var(--accent);width:' + Math.round(pr.pct) + '%"></div></div>'
+      : '<div style="font-size:12px;margin-bottom:8px;color:var(--text-muted);">No DD requirement on this bonus — log is for your records.</div>';
+    return '<div class="details-section-title">DD Log — what actually posted</div>' +
+      progressLine +
+      (entryRows || '<div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">No DDs logged yet.</div>') +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center;">' +
+        '<input type="date" id="ddlog-date" value="' + localTodayStr() + '" style="' + inputStyle + '">' +
+        '<input type="number" id="ddlog-amount" placeholder="Amount $" min="0" step="0.01" style="' + inputStyle + 'width:110px;">' +
+        '<input type="text" id="ddlog-method" list="ddlog-methods" placeholder="Method (Payroll DD…)" style="' + inputStyle + 'flex:1;min-width:130px;">' +
+        '<datalist id="ddlog-methods">' + methodOptions.map(m => '<option value="' + escHtml(m) + '"></option>').join('') + '</datalist>' +
+        '<button type="button" class="btn-primary btn-sm" id="ddlog-add-btn">＋ Log DD</button>' +
+      '</div>' +
+      '<div id="ddlog-error" style="display:none;font-size:12px;color:var(--red, #e5484d);margin-top:6px;"></div>';
+  }
+
+  function addDDLogEntry(id) {
+    const b = state.bonuses.find(x => x.id === id);
+    if (!b) return;
+    const date = el('ddlog-date') ? el('ddlog-date').value : '';
+    const amount = parseFloat(el('ddlog-amount') ? el('ddlog-amount').value : '');
+    const method = el('ddlog-method') ? el('ddlog-method').value.trim() : '';
+    const errEl = el('ddlog-error');
+    if (!date || isNaN(amount) || amount <= 0) {
+      if (errEl) { errEl.textContent = 'Enter a date and an amount above $0.'; errEl.style.display = 'block'; }
+      return;
+    }
+    const before = { ...b, ddLog: [...(b.ddLog || [])] };
+    b.ddLog = [...(b.ddLog || []), { date: date, amount: amount, method: method }];
+    logHistory('update', b.id, b.bank, b.person, before, { ...b, ddLog: [...b.ddLog] });
+    persistAll(); renderAll(); openView(id);
+  }
+
+  function removeDDLogEntry(id, idx) {
+    const b = state.bonuses.find(x => x.id === id);
+    if (!b || !Array.isArray(b.ddLog) || idx < 0 || idx >= b.ddLog.length) return;
+    const before = { ...b, ddLog: [...b.ddLog] };
+    b.ddLog = b.ddLog.filter((_, i) => i !== idx);
+    logHistory('update', b.id, b.bank, b.person, before, { ...b, ddLog: [...b.ddLog] });
+    persistAll(); renderAll(); openView(id);
+  }
+
+  // ── Tax Export ────────────────────────────────────────────────────────
+  // 4 columns only, per his spec: Bank · Player · Date Posted · Amount.
+  // A bonus is taxed in the year it posted (dateBonusPosted).
+  let taxYear = null;
+  const TAX_PERSON_ORDER = { you: 0, spouse: 1, joint: 2 };
+
+  function taxYearsAvailable() {
+    const ys = new Set();
+    state.bonuses.forEach(b => { if (b.dateBonusPosted) { const y = fmtYear(b.dateBonusPosted); if (y) ys.add(y); } });
+    return [...ys].sort((a, b2) => b2 - a);
+  }
+
+  function taxRowsFor(year) {
+    return state.bonuses
+      .filter(b => b.dateBonusPosted && fmtYear(b.dateBonusPosted) === year)
+      .sort((a, b2) =>
+        ((TAX_PERSON_ORDER[a.person] ?? 3) - (TAX_PERSON_ORDER[b2.person] ?? 3)) ||
+        String(a.dateBonusPosted).localeCompare(String(b2.dateBonusPosted)));
+  }
+
+  function renderTaxExport() {
+    const years = taxYearsAvailable();
+    const sel = el('tax-year-select');
+    const wrap = el('tax-table-wrap');
+    const emptyEl = el('tax-empty');
+    if (!sel || !wrap) return;
+    if (!years.length) { sel.innerHTML = ''; wrap.innerHTML = ''; emptyEl.style.display = ''; return; }
+    if (!taxYear || !years.includes(taxYear)) taxYear = years.includes(currentYear) ? currentYear : years[0];
+    sel.innerHTML = years.map(y => '<option value="' + y + '"' + (y === taxYear ? ' selected' : '') + '>' + y + '</option>').join('');
+    const rows = taxRowsFor(taxYear);
+    emptyEl.style.display = rows.length ? 'none' : '';
+    if (!rows.length) { wrap.innerHTML = ''; return; }
+    const th = t => '<th style="padding:6px 10px;text-align:left;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);">' + t + '</th>';
+    const td = (v, extra) => '<td style="padding:6px 10px;font-size:12px;border-bottom:1px solid var(--border);' + (extra || '') + '">' + v + '</td>';
+    let html = '<table style="border-collapse:collapse;width:100%;"><thead><tr>' + th('Bank') + th('Player') + th('Date Posted') + th('Amount') + '</tr></thead><tbody>';
+    let lastPerson = null, subtotal = 0, total = 0;
+    const subtotalRow = () => '<tr>' + td('', '') + td('', '') +
+      td('<span style="color:var(--text-muted);">Subtotal — ' + escHtml(PERSON_LABELS[lastPerson] || lastPerson || '') + '</span>', 'text-align:right;') +
+      td('<strong>' + currency.format(subtotal) + '</strong>', 'font-family:var(--font-mono);') + '</tr>';
+    rows.forEach(b => {
+      if (lastPerson !== null && b.person !== lastPerson) { html += subtotalRow(); subtotal = 0; }
+      lastPerson = b.person;
+      const amt = parseFloat(b.bonusAmount) || 0;
+      subtotal += amt; total += amt;
+      html += '<tr>' + td(escHtml(b.bank || '')) + td(escHtml(PERSON_LABELS[b.person] || b.person || '')) +
+        td(fmtDate(parseDate(b.dateBonusPosted))) +
+        td(currency.format(amt), 'font-family:var(--font-mono);') + '</tr>';
+    });
+    if (lastPerson !== null) html += subtotalRow();
+    html += '<tr>' + td('', '') + td('', '') +
+      td('<strong>Total — ' + taxYear + '</strong>', 'text-align:right;') +
+      td('<strong style="color:var(--accent);">' + currency.format(total) + '</strong>', 'font-family:var(--font-mono);') + '</tr>';
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+  }
+
+  function openTaxExport() { taxYear = null; renderTaxExport(); el('tax-modal').style.display = 'flex'; }
+  function closeTaxExport() { el('tax-modal').style.display = 'none'; }
+
+  function csvEsc(v) {
+    const t = String(v == null ? '' : v);
+    return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+  }
+
+  function taxCsvText() {
+    const rows = taxRowsFor(taxYear);
+    const lines = ['Bank,Player,Date,Amount'];
+    let total = 0;
+    rows.forEach(b => {
+      const amt = parseFloat(b.bonusAmount) || 0;
+      total += amt;
+      lines.push([csvEsc(b.bank || ''), csvEsc(PERSON_LABELS[b.person] || b.person || ''), csvEsc(b.dateBonusPosted || ''), amt.toFixed(2)].join(','));
+    });
+    lines.push(['Total', '', '', total.toFixed(2)].join(','));
+    return lines.join('\n');
+  }
+
+  function downloadTaxCsv() {
+    if (!taxYear) return;
+    const blob = new Blob([taxCsvText()], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'bank-bonuses-tax-' + taxYear + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
+  el('tax-export-btn').addEventListener('click', openTaxExport);
+  el('tax-close-btn').addEventListener('click', closeTaxExport);
+  el('tax-modal').addEventListener('click', e => { if (e.target === el('tax-modal')) closeTaxExport(); });
+  el('tax-year-select').addEventListener('change', e => { taxYear = parseInt(e.target.value); renderTaxExport(); });
+  el('tax-download-btn').addEventListener('click', downloadTaxCsv);
 
   // ── Permanent Accounts Tab ─────────────────────────────────────────────
   function renderKeepers() {
@@ -3399,7 +3629,7 @@
       cards += card('Safe Close', fmtDate(safe), dUntil !== null && dUntil > 0 ? 'in ' + dUntil + 'd' : 'ready');
     }
     const nextEl = computeNextEligible(b);
-    if (nextEl) cards += card('Repeat Eligible', fmtDate(nextEl), isRepeatReady(b) ? 'Ready!' : '');
+    if (nextEl && !hideRepeatDate(b, nextEl)) cards += card('Repeat Eligible', fmtDate(nextEl), isRepeatReady(b) ? 'Ready!' : '');
 
     const row = (label, valueHtml) => valueHtml
       ? '<div class="details-row"><span class="details-row-label">' + label + '</span><span class="details-row-value">' + valueHtml + '</span></div>' : '';
@@ -3449,6 +3679,7 @@
       (b.requirements ? '<div class="details-section-title">Requirements</div><div class="details-notes">' + escHtml(b.requirements) + '</div>' : '') +
       section('Account', accountRows) +
       section('Requirements & Fees', reqRows) +
+      ddLogSectionHtml(b) +
       section('Terms & Repeat', termRows) +
       (b.eligibilityNotes ? '<div class="details-section-title">Eligibility / State Notes</div><div class="details-notes">' + escHtml(b.eligibilityNotes) + '</div>' : '') +
       (b.notes ? '<div class="details-section-title">Notes</div><div class="details-notes">' + escHtml(b.notes) + '</div>' : '') +
@@ -3456,6 +3687,10 @@
       (emptyCount ? '<div style="font-size:11px;color:var(--text-dim);margin-top:14px;">' + emptyCount + ' empty field' + (emptyCount !== 1 ? 's' : '') + ' hidden in view mode.</div>' : '');
 
     el('details-history-btn').textContent = '🕐 History (' + countBankHistory(b) + ')';
+    const ddAddBtn = el('ddlog-add-btn');
+    if (ddAddBtn) ddAddBtn.addEventListener('click', () => addDDLogEntry(id));
+    el('details-body').querySelectorAll('[data-ddlog-del]').forEach(btn =>
+      btn.addEventListener('click', () => removeDDLogEntry(id, parseInt(btn.dataset.ddlogDel))));
     el('details-modal').style.display = 'flex';
   }
 
@@ -3527,6 +3762,7 @@
     if (entry.cooldownPreset !== 'custom' && entry.cooldownPreset !== 'lifetime') entry.cooldownMonths = entry.cooldownPreset;
     const isEdit = !!state.editingId;
     const before = isEdit ? { ...state.bonuses.find(b => b.id === state.editingId) } : null;
+    if (isEdit && before && Array.isArray(before.ddLog)) entry.ddLog = before.ddLog; // DD log lives outside the form — never wipe it on edit
     if (isEdit) { const idx = state.bonuses.findIndex(b => b.id === state.editingId); if (idx !== -1) state.bonuses[idx] = entry; }
     else state.bonuses.push(entry);
     logHistory(isEdit ? 'update' : 'create', entry.id, entry.bank, entry.person, before, { ...entry });

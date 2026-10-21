@@ -4,6 +4,10 @@ All code changes to the Bank Bonus tracker site. Data lives in Google Drive
 (`bank-bonus-tracker.json`); this file tracks code only.
 
 ## 2026-10-21
+- DD Progress Log: log each direct deposit that actually posted (date / amount / method) from the Details view; progress ("Posted 1 of 2 · $1,500 of $3,000") with a progress bar in the main table and Details, a green "DD met" tag when the count and total are both satisfied (a DD counts when it meets the required per-DD amount). Entries are stored in the bonus record, survive form edits, and every add/remove is recorded in the Change Log.
+- Tax Export: new button on the "Received This Year" card opens a per-year export — Bank / Player / Date Posted / Amount, subtotal per player, year total, and a CSV download with the same four columns. A bonus is taxed in the year it posted.
+- Repeat dates: a repeat-eligible date in the past is no longer shown on an account that has already been (re)opened (main table, Details card, and History rows where a newer account is active) — it was computed from the previous churn and is noise once you're in the new one. Future dates and closed accounts still show it.
+- History diffs no longer show phantom "— → —" lines for fields that were missing (vs blank) in older records.
 - XSS hardening (the deferred fix): all user-data text (bank, account
   name/type, requirements, notes-derived labels, person/status fallbacks)
   is now HTML-escaped at every rendering site — main table, Closed
