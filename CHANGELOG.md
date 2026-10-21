@@ -4,6 +4,15 @@ All code changes to the Bank Bonus tracker site. Data lives in Google Drive
 (`bank-bonus-tracker.json`); this file tracks code only.
 
 ## 2026-10-21
+- XSS hardening (the deferred fix): all user-data text (bank, account
+  name/type, requirements, notes-derived labels, person/status fallbacks)
+  is now HTML-escaped at every rendering site — main table, Closed
+  section, History tab, Keepers, rechurn list, week widget, reminders,
+  Change Log, CSV import preview, and the Fix Account Types modal.
+  Data-* id attributes are escaped too. Source URLs now pass through a
+  scheme check (`safeUrl`): only http(s) links render as links, anything
+  else (e.g. a `javascript:` URL in imported data) becomes `#`.
+  No visual changes for normal data.
 - Rebuilt View-only mode as a dedicated Details modal: summary cards
   (Opened / DD Deadline / Bonus Posted / Safe Close / Repeat Eligible),
   grouped Account / Requirements & Fees / Terms & Repeat sections, and
