@@ -3,6 +3,24 @@
 All code changes to the Bank Bonus tracker site. Data lives in Google Drive
 (`bank-bonus-tracker.json`); this file tracks code only.
 
+## 2026-10-21
+- Rebuilt View-only mode as a dedicated Details modal: summary cards
+  (Opened / DD Deadline / Bonus Posted / Safe Close / Repeat Eligible),
+  grouped Account / Requirements & Fees / Terms & Repeat sections, and
+  empty fields hidden instead of shown blank. Replaces the locked
+  edit-form view.
+- Added per-bank History: a "🕐 History (n)" button next to View/Edit on
+  the main table, Closed section, History tab, Keepers, and the rechurn
+  list opens a timeline for that bank only, with scope toggles
+  (This bonus / All bank — this person / All bank). Update events show
+  real old → new value diffs (the Change Log tab only listed field
+  names). Bonuses with no Change Log events get synthesized lifecycle
+  lines (Opened / Bonus posted / Closed + repeat-eligible date), so
+  bonuses from before the Change Log existed (2026-10-18) are not
+  blank. Bank names in the Change Log tab now link into the same
+  per-bank history, and the modal links back to the Change Log
+  filtered to that bank.
+
 ## 2026-10-18
 - Added Change Log: every bonus create, update, delete, and bulk change is now
   recorded like a history table — timestamp, action, before/after snapshot —

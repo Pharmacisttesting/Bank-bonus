@@ -1131,6 +1131,50 @@
     .history-row:last-child { border-bottom:none; }
     .history-row-main { flex:1; min-width:0; }
 
+    /* ── Details (view-only) + per-bank History modals ─────────── */
+    .details-summary {
+      display:grid; grid-template-columns:repeat(auto-fit,minmax(128px,1fr));
+      gap:8px; margin:14px 0;
+    }
+    .details-card {
+      background:var(--surface-3); border:1px solid var(--border);
+      border-radius:var(--r-md); padding:10px 12px;
+    }
+    .details-card-label {
+      font-family:var(--font-mono); font-size:9px; letter-spacing:.12em;
+      text-transform:uppercase; color:var(--text-muted); margin-bottom:4px;
+    }
+    .details-card-value { font-size:13px; font-weight:600; color:var(--text); }
+    .details-card-sub { font-size:11px; color:var(--text-dim); margin-top:2px; }
+    .details-section-title { font-size:13px; font-weight:700; color:var(--text); margin:16px 0 6px; }
+    .details-grid { display:grid; grid-template-columns:1fr 1fr; gap:2px 24px; }
+    @media (max-width:560px) { .details-grid { grid-template-columns:1fr; } }
+    .details-row {
+      display:flex; justify-content:space-between; gap:14px;
+      padding:5px 0; border-bottom:1px solid var(--border); font-size:12px;
+    }
+    .details-row-label { color:var(--text-muted); flex-shrink:0; }
+    .details-row-value { color:var(--text); text-align:right; word-break:break-word; }
+    .details-notes { font-size:12px; color:var(--text-muted); line-height:1.6; white-space:pre-wrap; }
+    .hist-scope-row { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
+    .hist-timeline { position:relative; margin-left:8px; padding-left:24px; border-left:2px solid var(--border); }
+    .hist-ev { position:relative; padding-bottom:16px; }
+    .hist-ev:last-child { padding-bottom:2px; }
+    .hist-dot {
+      position:absolute; left:-31px; top:3px; width:12px; height:12px;
+      border-radius:50%; border:2px solid var(--surface-2);
+    }
+    .hist-title { font-size:13px; font-weight:600; color:var(--text); }
+    .hist-meta { font-size:11px; color:var(--text-dim); }
+    .hist-diff {
+      font-size:12px; color:var(--text-muted); background:var(--surface-3);
+      border:1px solid var(--border); border-radius:var(--r-sm);
+      padding:8px 10px; margin-top:6px; line-height:1.7;
+    }
+    .hist-old { text-decoration:line-through; opacity:.65; }
+    .hist-new { color:var(--accent); font-weight:600; }
+    .hist-field { font-family:var(--font-mono); font-size:11px; }
+
     /* ── Date Picker Wrapper ─────────────────────────────────────── */
     .date-input-wrap {
       position: relative;
@@ -1913,6 +1957,43 @@
   </div>
 </div>
 
+<!-- ══ DETAILS (VIEW-ONLY) MODAL ═══════════════════════════════════ -->
+<div class="modal-backdrop" id="details-modal" style="display:none;">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <span class="modal-title" id="details-title">View</span>
+      <button type="button" class="btn-ghost btn-sm" id="details-close-btn">✕ Close</button>
+    </div>
+    <div class="modal-body">
+      <div id="details-body"></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:18px;">
+        <button type="button" class="btn-secondary btn-sm" id="details-history-btn">🕐 History</button>
+        <button type="button" class="btn-secondary btn-sm" id="details-edit-btn">Edit</button>
+        <button type="button" class="btn-ghost btn-sm" id="details-rechurn-btn">🔁 Rechurn</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PER-BANK HISTORY MODAL ═══════════════════════════════════════ -->
+<div class="modal-backdrop" id="bank-history-modal" style="display:none;">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <span class="modal-title" id="bank-history-title">History</span>
+      <button type="button" class="btn-ghost btn-sm" id="bank-history-close-btn">✕ Close</button>
+    </div>
+    <div class="modal-body">
+      <p class="helper-text" id="bank-history-sub" style="margin-bottom:12px;"></p>
+      <div class="hist-scope-row" id="bank-history-scopes"></div>
+      <div id="bank-history-list"></div>
+      <div class="empty-state" id="bank-history-empty" style="display:none;">No history recorded for this scope yet.</div>
+      <div style="margin-top:14px;">
+        <button type="button" class="btn-ghost btn-sm" id="bank-history-changelog-btn">Open full Change Log filtered to this bank →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ══ CSV IMPORT MODAL ══════════════════════════════════════════ -->
 <div class="modal-backdrop" id="csv-modal">
   <div class="modal-dialog" style="max-width:620px;">
@@ -2031,6 +2112,9 @@
   let isDriveConnected = false;
   let historyFileId  = null;
   let historyEvents  = [];
+  let detailsId = null;
+  let bankHistAnchor = null;
+  let bankHistScope = 'this';
   let closedSectionOpen = false;
   let rechurnOpen = false;
   let historyYearFilter = 'all';
@@ -2527,6 +2611,7 @@
         '<div style="margin-top:6px;display:flex;gap:6px;">'+
           '<button class="btn-primary btn-sm" data-rechurn="'+b.id+'">🔁 Rechurn</button>'+
           '<button class="btn-ghost btn-sm" data-view="'+b.id+'">👁 View</button>'+
+          historyBtnHtml(b)+
           '<button class="btn-ghost btn-sm" data-edit="'+b.id+'">Edit</button>'+
         '</div></div>';
     }).join('');
@@ -2628,6 +2713,7 @@
             '<td data-label="Requirements">'+(reqHtml||'<span style="color:var(--text-dim)">—</span>')+'</td>'+
             '<td data-label="Actions"><div style="display:flex;gap:4px;flex-wrap:wrap;">'+
               '<button type="button" class="btn-ghost btn-sm" data-view="'+b.id+'">👁 View</button>'+
+              historyBtnHtml(b)+
               '<button type="button" class="btn-secondary btn-sm" data-edit="'+b.id+'">Edit</button>'+
               '<button type="button" class="btn-danger btn-sm" data-delete="'+b.id+'">Del</button>'+
             '</div></td>';
@@ -2698,6 +2784,7 @@
             rechurnBtn+
             archiveBtn+
             '<button class="btn-ghost btn-sm" data-view="'+b.id+'">👁 View</button>'+
+            historyBtnHtml(b)+
             '<button class="btn-secondary btn-sm" data-edit="'+b.id+'">Edit</button>'+
           '</div></td>';
         tbody.appendChild(tr);
@@ -2786,6 +2873,7 @@
           '<div style="display:flex;gap:6px;align-items:flex-start;flex-shrink:0;">'+
             '<button class="btn-primary btn-sm" data-rechurn="'+b.id+'">🔁 Rechurn</button>'+
             '<button class="btn-ghost btn-sm" data-view="'+b.id+'">👁 View</button>'+
+            historyBtnHtml(b)+
             '<button class="btn-secondary btn-sm" data-edit="'+b.id+'">Edit</button>'+
           '</div>'+
         '</div>';
@@ -2864,7 +2952,7 @@
     listEl.innerHTML = events.map(e =>
       '<div style="padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px;">' +
         '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' + actionPill(e.action) +
-          '<strong>' + (e.bank || '(no bank)') + '</strong>' +
+          '<strong><a href="#" data-history-bank="' + escHtml(e.bank || '') + '" data-history-person="' + escHtml(e.person || '') + '" data-history-id="' + escHtml(e.id || '') + '" style="color:inherit;text-decoration:underline dotted;" title="See history for this bank only">' + escHtml(e.bank || '(no bank)') + '</a></strong>' +
           (e.person ? '<span style="color:var(--text-muted)">' + personTag(e.person) + '</span>' : '') +
           '<span style="color:var(--text-dim);margin-left:auto;">' + new Date(e.ts).toLocaleString() + '</span>' +
         '</div>' +
@@ -2872,6 +2960,201 @@
       '</div>'
     ).join('');
   }
+
+  // ── Field labels / value formatting (Details + History diffs) ────────
+  const FIELD_LABELS = {
+    person:'Person', bank:'Bank', accountType:'Account Type', accountName:'Account Name',
+    accountLast4:'Account # (last 4)', accountHolder:'Name on Account', loginLabel:'Login Label',
+    accountTrack:'Tracking Mode', bonusAmount:'Bonus Amount ($)', referralBonus:'Referral Bonus ($)',
+    status:'Status', perHousehold:'Bonus Rule', dateOpened:'Date Opened', offerExpiration:'Offer Expiration',
+    deadline:'Deadline', dateRequirementsMet:'Date Requirements Met', dateBonusPosted:'Date Bonus Posted',
+    dateClosed:'Date Closed', minBalance:'Min Balance ($)', minBalanceDays:'Min Balance Hold (days)',
+    ddAmount:'Direct Deposit Amount ($)', ddCount:'DD Count', ddMethods:'DD Methods That Worked',
+    chexSystems:'ChexSystems / EWS Pull', pullDate:'Pull Date', monthlyFee:'Monthly Fee ($)',
+    etfAmount:'Early Termination Fee ($)', etfDays:'ETF Hold Period (days)', cooldownPreset:'Repeat Rule Preset',
+    cooldownMonths:'Cooldown (months)', repeatAnchor:'Repeat Rule Anchor', plannedLifeMonths:'Planned Life (months)',
+    remindBeforeDeadlineDays:'Remind Before Deadline (days)', remindBeforeRepeatDays:'Remind Before Repeat (days)',
+    remindBeforeCloseDays:'Remind Before Close (days)', requirements:'Requirements', feeWaiver:'Fee Waiver Details',
+    eligibilityNotes:'Eligibility / State Notes', sourceUrl:'Source URL', notes:'Notes'
+  };
+  const DATE_FIELDS = ['dateOpened','offerExpiration','deadline','dateRequirementsMet','dateBonusPosted','dateClosed','pullDate'];
+  const MONEY_FIELDS = ['bonusAmount','referralBonus','minBalance','ddAmount','monthlyFee','etfAmount'];
+  const PERSON_LABELS = { you:'You', spouse:'Spouse', joint:'Joint' };
+
+  function fmtFieldValue(field, v) {
+    if (v === undefined || v === null || String(v).trim() === '') return '—';
+    if (DATE_FIELDS.includes(field)) { const d = parseDate(v); return d ? fmtDate(d) : escHtml(String(v)); }
+    if (MONEY_FIELDS.includes(field)) { const n = parseFloat(v); return isNaN(n) ? escHtml(String(v)) : currency.format(n); }
+    if (field === 'status') return escHtml(statusLabel(v));
+    if (field === 'person') return escHtml(PERSON_LABELS[v] || String(v));
+    return escHtml(String(v));
+  }
+
+  // ── Per-bank History ──────────────────────────────────────────────────
+  // Timeline for ONE bank, built from two sources:
+  //  1. Change Log events (historyEvents) — real old → new diffs.
+  //  2. Lifecycle lines synthesized from the bonus record itself (opened /
+  //     posted / closed) for bonuses with no Change Log events — the log
+  //     only started 2026-10-18, so older bonuses would otherwise be blank.
+  // Scopes: 'this' = this bonus only · 'bankPerson' = all of this bank for
+  // this person · 'all' = all of this bank, both players.
+  function bankKeyOf(x) { return (x.bank || '').trim().toLowerCase(); }
+
+  function scopedBonusesFor(anchor, scope) {
+    if (!anchor) return [];
+    if (scope === 'this') return anchor.id ? state.bonuses.filter(b => b.id === anchor.id) : [];
+    if (scope === 'all') return state.bonuses.filter(b => bankKeyOf(b) === bankKeyOf(anchor));
+    return state.bonuses.filter(b => bankKeyOf(b) === bankKeyOf(anchor) && b.person === anchor.person);
+  }
+
+  function buildBankHistory(anchor, scope) {
+    if (!anchor) return [];
+    const scoped = scopedBonusesFor(anchor, scope);
+    const scopedIds = new Set(scoped.map(b => b.id));
+    const items = [];
+
+    // 1 ─ Change Log events in scope
+    historyEvents.forEach(e => {
+      let inScope = false;
+      if (scope === 'this') inScope = !!anchor.id && e.id === anchor.id;
+      else if (scope === 'all') inScope = (e.id && scopedIds.has(e.id)) || bankKeyOf(e) === bankKeyOf(anchor);
+      else inScope = (e.id && scopedIds.has(e.id)) || (bankKeyOf(e) === bankKeyOf(anchor) && e.person === anchor.person);
+      if (!inScope || e.action === 'bulk_update') return;
+      const when = e.ts ? new Date(e.ts) : null;
+      const titles = { create:'Created', update:'Updated', delete:'Deleted' };
+      let detail = '';
+      if (e.action === 'update' && e.before && e.after) {
+        const keys = Object.keys(e.after).filter(k => k !== 'id' && String(e.before[k] ?? '') !== String(e.after[k] ?? ''));
+        detail = keys.length ? keys.slice(0, 10).map(k =>
+          '<div><span class="hist-field">' + escHtml(FIELD_LABELS[k] || k) + ':</span> ' +
+          '<span class="hist-old">' + fmtFieldValue(k, e.before[k]) + '</span> → ' +
+          '<span class="hist-new">' + fmtFieldValue(k, e.after[k]) + '</span></div>').join('')
+          + (keys.length > 10 ? '<div>… +' + (keys.length - 10) + ' more fields</div>' : '')
+          : 'No field changes.';
+      } else if (e.action === 'create' && e.after) {
+        const a = e.after;
+        detail = currency.format(parseFloat(a.bonusAmount) || 0) + ' · ' + escHtml(acctLabel(a)) +
+          (a.ddAmount ? ' · DD ' + currency.format(parseFloat(a.ddAmount)) + (a.ddCount ? ' × ' + escHtml(a.ddCount) : '') : '') +
+          (a.deadline ? ' · Deadline ' + fmtDate(parseDate(a.deadline)) : '');
+      } else if (e.action === 'delete' && e.before) {
+        const a = e.before;
+        detail = currency.format(parseFloat(a.bonusAmount) || 0) + ' · ' + escHtml(acctLabel(a)) + ' · entry deleted';
+      }
+      items.push({ date: when, pinLast: false, kind: e.action, person: e.person || '',
+        title: titles[e.action] || e.action, source: 'Change Log',
+        meta: when ? when.toLocaleString() : '', detail: detail });
+    });
+
+    // 2 ─ Lifecycle lines for bonuses with no Change Log events of their own
+    scoped.forEach(b => {
+      const hasOwn = historyEvents.some(e => e.id === b.id);
+      if (hasOwn) return;
+      const who = scope === 'all' && b.person !== anchor.person ? personTag(b.person) + ' ' : '';
+      if (b.dateOpened) items.push({ date: parseDate(b.dateOpened), pinLast: false, kind: 'lifecycle', person: b.person,
+        title: who + 'Opened', source: 'Lifecycle', meta: fmtDate(parseDate(b.dateOpened)),
+        detail: currency.format(parseFloat(b.bonusAmount) || 0) + ' · ' + escHtml(acctLabel(b)) });
+      if (b.dateBonusPosted) items.push({ date: parseDate(b.dateBonusPosted), pinLast: false, kind: 'lifecycle', person: b.person,
+        title: who + 'Bonus posted', source: 'Lifecycle', meta: fmtDate(parseDate(b.dateBonusPosted)),
+        detail: currency.format(parseFloat(b.bonusAmount) || 0) + ' posted' });
+      if (b.dateClosed) {
+        const nx = computeNextEligible(b);
+        items.push({ date: parseDate(b.dateClosed), pinLast: false, kind: 'lifecycle', person: b.person,
+          title: who + (b.id === anchor.id ? 'Closed' : 'Closed — prior churn'), source: 'Lifecycle', meta: fmtDate(parseDate(b.dateClosed)),
+          detail: (b.dateBonusPosted ? currency.format(parseFloat(b.bonusAmount) || 0) + ' posted · ' : '') +
+            (nx ? 'Repeat eligible ' + fmtDate(nx) : 'No repeat date') });
+      }
+    });
+
+    // 3 ─ Next milestone for the anchor bonus (pinned to the bottom)
+    const anchorBonus = anchor.id ? state.bonuses.find(b => b.id === anchor.id) : null;
+    if (anchorBonus && anchorBonus.deadline && !isClosedBonus(anchorBonus)) {
+      items.push({ date: parseDate(anchorBonus.deadline), pinLast: true, kind: 'milestone', person: anchorBonus.person,
+        title: 'Next milestone — DD deadline', source: 'Deadline', meta: fmtDate(parseDate(anchorBonus.deadline)),
+        detail: (anchorBonus.ddAmount ? 'DD ' + currency.format(parseFloat(anchorBonus.ddAmount)) + (anchorBonus.ddCount ? ' × ' + anchorBonus.ddCount : '') + ' must post by this date.' : 'Requirements must be met by this date.') });
+    }
+
+    items.sort((a, b2) => {
+      if (a.pinLast !== b2.pinLast) return a.pinLast ? 1 : -1;
+      return (b2.date || 0) - (a.date || 0);
+    });
+    return items;
+  }
+
+  function countBankHistory(b) { return buildBankHistory(b, 'bankPerson').length; }
+  function historyBtnHtml(b) {
+    return '<button type="button" class="btn-ghost btn-sm" data-history="' + b.id + '">🕐 History (' + countBankHistory(b) + ')</button>';
+  }
+
+  function openBankHistory(id) {
+    const b = state.bonuses.find(x => x.id === id);
+    if (!b) return;
+    bankHistAnchor = { id: b.id, bank: b.bank, person: b.person, accountType: b.accountType, accountName: b.accountName };
+    bankHistScope = 'this';
+    renderBankHistory();
+    el('bank-history-modal').style.display = 'flex';
+  }
+
+  function openBankHistoryByBank(bank, person, focusId) {
+    const focus = focusId ? state.bonuses.find(x => x.id === focusId) : null;
+    if (focus) { openBankHistory(focus.id); return; }
+    bankHistAnchor = { id: focusId || null, bank: bank || '', person: person || '', accountType: '', accountName: '' };
+    bankHistScope = focusId ? 'this' : 'bankPerson';
+    renderBankHistory();
+    el('bank-history-modal').style.display = 'flex';
+  }
+
+  function closeBankHistory() { el('bank-history-modal').style.display = 'none'; bankHistAnchor = null; }
+
+  function renderBankHistory() {
+    const anchor = bankHistAnchor;
+    if (!anchor) return;
+    el('bank-history-title').textContent = 'History — ' + (anchor.bank || 'Bonus');
+    const acctTxt = anchor.accountType ? ' · ' + escHtml(acctLabel(anchor)) : '';
+    el('bank-history-sub').innerHTML = escHtml(anchor.bank || '') + acctTxt + ' · ' +
+      escHtml(PERSON_LABELS[anchor.person] || anchor.person || '') +
+      ' · Only this bank — not the global Change Log';
+
+    const scopes = [
+      ['this', 'This bonus'],
+      ['bankPerson', 'All ' + (anchor.bank || 'bank') + ' — ' + (PERSON_LABELS[anchor.person] || 'You')],
+      ['all', 'All ' + (anchor.bank || 'bank')]
+    ];
+    el('bank-history-scopes').innerHTML = scopes.map(([k, label]) =>
+      '<button type="button" class="person-tab' + (bankHistScope === k ? ' active' : '') + '" data-hscope="' + k + '">' + escHtml(label) + '</button>').join('');
+    el('bank-history-scopes').querySelectorAll('[data-hscope]').forEach(btn =>
+      btn.addEventListener('click', () => { bankHistScope = btn.dataset.hscope; renderBankHistory(); }));
+
+    const items = buildBankHistory(anchor, bankHistScope);
+    const dotColor = k => ({ create:'#1e9e55', update:'#3b82f6', delete:'#ef4444', lifecycle:'#f59e0b', milestone:'#9ca3af' }[k] || '#9ca3af');
+    el('bank-history-empty').style.display = items.length ? 'none' : '';
+    el('bank-history-list').innerHTML = items.length
+      ? '<div class="hist-timeline">' + items.map(it =>
+          '<div class="hist-ev"><span class="hist-dot" style="background:' + dotColor(it.kind) + ';"></span>' +
+          '<div><span class="hist-title">' + escHtml(it.title) + '</span> ' +
+          '<span class="hist-meta">' + escHtml(it.meta || '') + ' · ' + escHtml(it.source) + '</span></div>' +
+          (it.detail ? '<div class="hist-diff">' + it.detail + '</div>' : '') +
+          '</div>').join('') + '</div>'
+      : '';
+  }
+
+  // Details + per-bank History modal wiring
+  el('details-close-btn').addEventListener('click', closeDetails);
+  el('details-modal').addEventListener('click', e => { if (e.target === el('details-modal')) closeDetails(); });
+  el('details-history-btn').addEventListener('click', () => { const id = detailsId; closeDetails(); if (id) openBankHistory(id); });
+  el('details-edit-btn').addEventListener('click', () => { const id = detailsId; closeDetails(); if (id) openEdit(id); });
+  el('details-rechurn-btn').addEventListener('click', () => { const id = detailsId; closeDetails(); if (id) openRechurn(id); });
+  el('bank-history-close-btn').addEventListener('click', closeBankHistory);
+  el('bank-history-modal').addEventListener('click', e => { if (e.target === el('bank-history-modal')) closeBankHistory(); });
+  el('bank-history-changelog-btn').addEventListener('click', () => {
+    const bank = bankHistAnchor ? bankHistAnchor.bank : '';
+    closeBankHistory();
+    const tabBtn = document.querySelector('.tab-btn[data-tab="changelog"]');
+    if (tabBtn) tabBtn.click();
+    changeLogSearch = bank || '';
+    const searchEl = el('changelog-search');
+    if (searchEl) searchEl.value = changeLogSearch;
+    renderChangeLog();
+  });
 
   // ── Permanent Accounts Tab ─────────────────────────────────────────────
   function renderKeepers() {
@@ -2913,6 +3196,7 @@
           '<div style="display:flex;gap:4px;">'+
             '<button class="btn-primary btn-sm" data-rechurn="'+b.id+'">+ New Churn</button>'+
             '<button class="btn-ghost btn-sm" data-view="'+b.id+'">👁 View</button>'+
+            historyBtnHtml(b)+
             '<button class="btn-secondary btn-sm" data-edit="'+b.id+'">Edit</button>'+
             '<button class="btn-ghost btn-sm" data-unkeepe="'+b.id+'" title="Move back to churn tracking">Unkeep</button>'+
           '</div>'+
@@ -3077,24 +3361,99 @@
     formModalEl.style.display = 'flex';
   }
 
-  // View-only mode: same modal as edit, but every field is locked and there is no save
+  // View-only mode: dedicated Details modal — summary cards up top, sections
+  // below, empty fields hidden (replaces the old locked-edit-form view).
   function openView(id) {
     const b = state.bonuses.find(x => x.id === id);
     if (!b) return;
-    state.editingId = null;
-    state.viewMode = true;
-    formTitleEl.textContent = 'View — ' + (b.bank || 'Bonus');
-    editingPillEl.style.display = 'none';
-    clonePillEl.style.display = 'none';
-    formErrorEl.style.display = 'none';
-    el('bonus-id').value = id;
-    formFields.forEach(f => { const field = el(f); if (field) { field.value = b[f] !== undefined ? b[f] : ''; field.disabled = true; } });
-    el('save-btn').style.display = 'none';
-    el('reset-btn').style.display = 'none';
-    formModalEl.querySelectorAll('.date-cal-btn').forEach(btn => btn.style.display = 'none');
-    updateDDDatalist();
-    formModalEl.style.display = 'flex';
+    detailsId = id;
+    el('details-title').textContent = 'View — ' + (b.bank || 'Bonus');
+
+    const card = (label, value, sub) =>
+      '<div class="details-card"><div class="details-card-label">' + label + '</div>' +
+      '<div class="details-card-value">' + value + '</div>' +
+      (sub ? '<div class="details-card-sub">' + sub + '</div>' : '') + '</div>';
+
+    let cards = '';
+    cards += card('Opened', b.dateOpened ? fmtDate(parseDate(b.dateOpened)) : '—', '');
+    if (b.deadline) {
+      const dl = parseDate(b.deadline);
+      const dLeft = dl ? daysBetween(today, dl) : null;
+      cards += card('DD Deadline', fmtDate(dl), dLeft !== null && dLeft >= 0 ? dLeft + ' day' + (dLeft !== 1 ? 's' : '') + ' left' : (dLeft !== null ? 'passed' : ''));
+    }
+    cards += card('Bonus Posted', b.dateBonusPosted ? fmtDate(parseDate(b.dateBonusPosted)) : '—',
+      b.dateBonusPosted ? currency.format(b.bonusAmount || 0) : '');
+    if (b.dateClosed) {
+      cards += card('Closed', fmtDate(parseDate(b.dateClosed)), '');
+    } else if (b.etfDays && (b.dateOpened || b.dateBonusPosted)) {
+      const dUntil = daysUntilSafeToClose(b);
+      const anchor = parseDate(b.dateOpened || b.dateBonusPosted);
+      const safe = anchor ? new Date(anchor) : null;
+      if (safe) safe.setDate(safe.getDate() + parseInt(b.etfDays));
+      cards += card('Safe Close', fmtDate(safe), dUntil !== null && dUntil > 0 ? 'in ' + dUntil + 'd' : 'ready');
+    }
+    const nextEl = computeNextEligible(b);
+    if (nextEl) cards += card('Repeat Eligible', fmtDate(nextEl), isRepeatReady(b) ? 'Ready!' : '');
+
+    const row = (label, valueHtml) => valueHtml
+      ? '<div class="details-row"><span class="details-row-label">' + label + '</span><span class="details-row-value">' + valueHtml + '</span></div>' : '';
+    const fv = f => fmtFieldValue(f, b[f]);
+    const has = f => b[f] !== undefined && b[f] !== null && String(b[f]).trim() !== '' && String(b[f]) !== '0';
+
+    const accountRows =
+      row('Account', escHtml(acctLabel(b))) +
+      (has('accountLast4') ? row('Account #', '···' + escHtml(b.accountLast4)) : '') +
+      (has('accountHolder') ? row('Name on Account', fv('accountHolder')) : '') +
+      (has('loginLabel') ? row('Login Label', fv('loginLabel')) : '') +
+      row('Tracking Mode', escHtml(b.accountTrack === 'keeper' ? 'Keeper' : (b.accountTrack === 'archived' ? 'Archived' : 'Churn'))) +
+      (has('perHousehold') ? row('Bonus Rule', fv('perHousehold')) : '');
+
+    let reqRows = '';
+    if (has('ddAmount')) reqRows += row('Direct Deposit', currency.format(parseFloat(b.ddAmount)) + (b.ddCount ? ' × ' + escHtml(b.ddCount) : ''));
+    if (has('ddMethods')) reqRows += row('DD Methods', fv('ddMethods'));
+    if (has('minBalance')) reqRows += row('Min Balance', currency.format(parseFloat(b.minBalance)) + (b.minBalanceDays ? ' × ' + escHtml(b.minBalanceDays) + 'd' : ''));
+    if (has('monthlyFee')) reqRows += row('Monthly Fee', currency.format(parseFloat(b.monthlyFee)) + '/mo');
+    if (has('feeWaiver')) reqRows += row('Fee Waiver', fv('feeWaiver'));
+
+    let termRows = '';
+    if (has('cooldownPreset') || has('cooldownMonths')) termRows += row('Repeat Rule', escHtml(b.cooldownPreset === 'lifetime' ? 'Lifetime — no repeat' : (b.cooldownMonths ? b.cooldownMonths + ' months' : b.cooldownPreset || '')));
+    if (has('repeatAnchor')) termRows += row('Repeat Anchor', fv('repeatAnchor'));
+    if (has('etfAmount')) termRows += row('Early Term. Fee', currency.format(parseFloat(b.etfAmount)) + (b.etfDays ? ' (hold ' + escHtml(b.etfDays) + 'd)' : ''));
+    else if (has('etfDays')) termRows += row('ETF Hold', escHtml(b.etfDays) + ' days');
+    if (has('plannedLifeMonths')) termRows += row('Planned Life', escHtml(b.plannedLifeMonths) + ' months');
+    if (has('chexSystems')) termRows += row('ChexSystems / EWS', fv('chexSystems'));
+    if (has('pullDate')) termRows += row('Pull Date', fv('pullDate'));
+    if (has('offerExpiration')) termRows += row('Offer Expiration', fv('offerExpiration'));
+    if (has('dateRequirementsMet')) termRows += row('Requirements Met', fv('dateRequirementsMet'));
+    if (has('referralBonus')) termRows += row('Referral Bonus', currency.format(parseFloat(b.referralBonus)));
+
+    const section = (title, rowsHtml) => rowsHtml
+      ? '<div class="details-section-title">' + title + '</div><div class="details-grid">' + rowsHtml + '</div>' : '';
+
+    const emptyCount = formFields.filter(f => b[f] === undefined || b[f] === null || String(b[f]).trim() === '').length;
+
+    el('details-body').innerHTML =
+      '<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start;">' +
+        '<div><div style="font-size:20px;font-weight:700;color:var(--text);">' + escHtml(b.bank || '') + '</div>' +
+        '<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">' + escHtml(acctLabel(b)) + ' &nbsp;' + personTag(b.person) + '</div></div>' +
+        '<div style="text-align:right;"><div style="font-family:var(--font-mono);font-size:22px;font-weight:600;color:var(--accent);">' + currency.format(b.bonusAmount || 0) + '</div>' +
+        '<span class="pill ' + statusPillClass(b.status) + '">' + statusLabel(b.status) + '</span></div>' +
+      '</div>' +
+      '<div class="details-summary">' + cards + '</div>' +
+      (b.requirements ? '<div class="details-section-title">Requirements</div><div class="details-notes">' + escHtml(b.requirements) + '</div>' : '') +
+      section('Account', accountRows) +
+      section('Requirements & Fees', reqRows) +
+      section('Terms & Repeat', termRows) +
+      (b.eligibilityNotes ? '<div class="details-section-title">Eligibility / State Notes</div><div class="details-notes">' + escHtml(b.eligibilityNotes) + '</div>' : '') +
+      (b.notes ? '<div class="details-section-title">Notes</div><div class="details-notes">' + escHtml(b.notes) + '</div>' : '') +
+      (b.sourceUrl ? '<div style="margin-top:12px;font-size:12px;"><a href="' + escHtml(b.sourceUrl) + '" target="_blank" rel="noopener" class="cell-link">Source ↗</a></div>' : '') +
+      (emptyCount ? '<div style="font-size:11px;color:var(--text-dim);margin-top:14px;">' + emptyCount + ' empty field' + (emptyCount !== 1 ? 's' : '') + ' hidden in view mode.</div>' : '');
+
+    el('details-history-btn').textContent = '🕐 History (' + countBankHistory(b) + ')';
+    el('details-modal').style.display = 'flex';
   }
+
+  function closeDetails() { el('details-modal').style.display = 'none'; detailsId = null; }
 
   // Rechurn: clone an old bonus into a fresh "planned" entry
   // Carries over all terms/requirements, clears all dates and status
@@ -3556,10 +3915,15 @@
   el('changelog-search').addEventListener('input', e => { changeLogSearch = e.target.value; renderChangeLog(); });
   el('bank').addEventListener('input', updateDDDatalist);
 
-  // View-only mode: one delegated listener covers every View button on the page
+  // View-only + per-bank History: one delegated listener covers every
+  // View / History button on the page (including dynamically rendered lists)
   document.addEventListener('click', e => {
     const v = e.target.closest('[data-view]');
-    if (v && v.dataset.view) openView(v.dataset.view);
+    if (v && v.dataset.view) { openView(v.dataset.view); return; }
+    const h = e.target.closest('[data-history]');
+    if (h && h.dataset.history) { openBankHistory(h.dataset.history); return; }
+    const hb = e.target.closest('[data-history-bank]');
+    if (hb) { e.preventDefault(); openBankHistoryByBank(hb.dataset.historyBank, hb.dataset.historyPerson, hb.dataset.historyId || null); }
   });
 
   // ── Logout modal ──────────────────────────────────────────────────────
