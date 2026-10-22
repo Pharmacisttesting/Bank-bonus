@@ -1,3 +1,8 @@
+## 2026-10-22
+- Person tags everywhere they're needed: This Week's Actions and Reminders items now show whose account it is (You / Spouse tag next to the bank).
+- This Week's Actions is split into labeled groups (Deadlines / Safe to close / Repeats ready / Planned closes) in its own container, with a second container beside it: Upcoming Repeats & Deadlines — DD deadlines on open accounts and repeat-eligible dates on closed accounts landing in the next 8–90 days, soonest first, each row clickable into Details. Items already in This Week or the rechurn callout don't repeat there. The two containers stack on narrow screens.
+- Tax Export button is now a full-width primary button ("🧾 Tax Export — CSV by Year") on the Received This Year card — it was a small ghost button that looked hidden.
+
 # Changelog
 
 All code changes to the Bank Bonus tracker site. Data lives in Google Drive

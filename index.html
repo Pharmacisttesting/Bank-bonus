@@ -609,6 +609,25 @@
     .week-item:last-child { border-bottom: none; }
     .week-empty { font-size: 12px; color: var(--text-muted); }
 
+    /* Week + Upcoming: two separate containers, side by side */
+    .week-row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 16px; }
+    .week-row .week-widget { flex: 1 1 320px; margin-bottom: 0; }
+    .week-group {
+      font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--accent); margin: 10px 0 2px;
+    }
+    .week-group:first-child { margin-top: 0; }
+    .upcoming-row {
+      display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap;
+      padding: 5px 2px; border-bottom: 1px solid var(--border);
+      font-size: 12px; color: var(--text); cursor: pointer;
+    }
+    .upcoming-row:last-child { border-bottom: none; }
+    .upcoming-row:hover { background: var(--surface-3); }
+    .upcoming-date { font-family: var(--font-mono); white-space: nowrap; }
+    .upcoming-away { color: var(--accent); font-size: 11px; white-space: nowrap; }
+    .upcoming-kind { margin-left: auto; color: var(--text-muted); font-size: 11px; white-space: nowrap; }
+
     /* ─── Person Tabs ─────────────────────────────────────────── */
     .person-tabs {
       display: flex;
@@ -1473,7 +1492,7 @@
         <div class="summary-label">Received This Year</div>
         <div class="summary-value" id="summary-tax-year">$0</div>
         <div class="summary-sub" id="summary-tax-year-label">Current calendar year</div>
-        <button type="button" class="btn-ghost btn-sm" id="tax-export-btn" style="margin-top:8px;">🧾 Tax Export</button>
+        <button type="button" class="btn-primary" id="tax-export-btn" style="display:block;width:100%;margin-top:10px;padding:9px 12px;font-size:13px;font-weight:700;">🧾 Tax Export — CSV by Year</button>
       </div>
       <div class="summary-card">
         <div class="summary-label">Received (All Time)</div>
@@ -1515,10 +1534,16 @@
       <div class="pipe-stage"><div class="pipe-label">Closed</div><div class="pipe-count" id="pipe-closed">0</div></div>
     </div>
 
-    <!-- This week -->
-    <div class="week-widget">
-      <div class="week-widget-head"><span class="live-dot"></span>&nbsp; This Week's Actions</div>
-      <div id="week-list"><span class="week-empty">Nothing urgent this week.</span></div>
+    <!-- This week + Upcoming (side by side, separate containers) -->
+    <div class="week-row">
+      <div class="week-widget">
+        <div class="week-widget-head"><span class="live-dot"></span>&nbsp; This Week's Actions</div>
+        <div id="week-list"><span class="week-empty">Nothing urgent this week.</span></div>
+      </div>
+      <div class="week-widget">
+        <div class="week-widget-head">📅 Upcoming Repeats &amp; Deadlines <span style="text-transform:none;letter-spacing:0;color:var(--text-muted);">· next 90 days</span></div>
+        <div id="upcoming-list"><span class="week-empty">Nothing in the next 90 days.</span></div>
+      </div>
     </div>
 
     <!-- Person filter -->
@@ -2603,19 +2628,62 @@
   // ── This Week ──────────────────────────────────────────────────────────
   function renderWeekWidget() {
     const wOut = new Date(today); wOut.setDate(wOut.getDate() + 7);
-    const items = [];
+    const groups = { deadlines: [], close: [], repeats: [], planned: [] };
     state.bonuses.forEach(b => {
       if (b.accountTrack === 'keeper' || b.accountTrack === 'archived') return; // no reminders for keepers/archived
-      if (b.deadline) { const dl = parseDate(b.deadline); if (dl && dl >= today && dl <= wOut) { const d = daysBetween(today,dl); items.push('🔴 <strong>'+escHtml(b.bank)+'</strong> deadline in '+d+' day'+(d===1?'':'s')+' ('+fmtDate(dl)+')'); } }
-      if (isReadyToClose(b)) items.push('✅ <strong>'+escHtml(b.bank)+' – '+escHtml(acctLabel(b))+'</strong> safe to close — '+escHtml(String(b.etfDays))+'d ETF hold elapsed (opened '+fmtDate(parseDate(b.dateOpened))+')');  
-      if (isRepeatReady(b) && CLOSED_STATUSES.includes(b.status)) items.push('🔁 <strong>'+escHtml(b.bank)+'</strong> cooldown elapsed — eligible to repeat');
+      if (b.deadline) { const dl = parseDate(b.deadline); if (dl && dl >= today && dl <= wOut) { const d = daysBetween(today,dl); groups.deadlines.push('🔴 <strong>'+escHtml(b.bank)+'</strong> '+personTag(b.person)+' deadline in '+d+' day'+(d===1?'':'s')+' ('+fmtDate(dl)+')'); } }
+      if (isReadyToClose(b)) groups.close.push('✅ <strong>'+escHtml(b.bank)+' – '+escHtml(acctLabel(b))+'</strong> '+personTag(b.person)+' safe to close — '+escHtml(String(b.etfDays))+'d ETF hold elapsed (opened '+fmtDate(parseDate(b.dateOpened))+')');
+      if (isRepeatReady(b) && CLOSED_STATUSES.includes(b.status)) groups.repeats.push('🔁 <strong>'+escHtml(b.bank)+'</strong> '+personTag(b.person)+' cooldown elapsed — eligible to repeat');
       if (b.dateOpened && b.plannedLifeMonths) {
         const op = parseDate(b.dateOpened);
-        if (op) { const pc = addMonths(op, parseInt(b.plannedLifeMonths)); if (pc >= today && pc <= wOut) { const d = daysBetween(today,pc); items.push('📅 <strong>'+escHtml(b.bank)+'</strong> planned close in '+d+' day'+(d===1?'':'s')+' ('+fmtDate(pc)+')'); } }
+        if (op) { const pc = addMonths(op, parseInt(b.plannedLifeMonths)); if (pc >= today && pc <= wOut) { const d = daysBetween(today,pc); groups.planned.push('📅 <strong>'+escHtml(b.bank)+'</strong> '+personTag(b.person)+' planned close in '+d+' day'+(d===1?'':'s')+' ('+fmtDate(pc)+')'); } }
       }
     });
     const wl = el('week-list');
-    wl.innerHTML = items.length === 0 ? '<span class="week-empty">Nothing urgent this week. 🎉</span>' : items.map(i => '<div class="week-item">'+i+'</div>').join('');
+    const sections = [
+      ['Deadlines', groups.deadlines], ['Safe to close', groups.close],
+      ['Repeats ready', groups.repeats], ['Planned closes', groups.planned]
+    ].filter(([, arr]) => arr.length);
+    wl.innerHTML = sections.length === 0
+      ? '<span class="week-empty">Nothing urgent this week. 🎉</span>'
+      : sections.map(([label, arr]) =>
+          '<div class="week-group">' + label + ' (' + arr.length + ')</div>' +
+          arr.map(i => '<div class="week-item">' + i + '</div>').join('')
+        ).join('');
+  }
+
+  // ── Upcoming Repeats & Deadlines (day 8–90) ────────────────────────────
+  // Deadlines on open accounts + repeat-eligible dates on closed accounts
+  // (skipping chains where a newer account is already active). Anything
+  // sooner lives in This Week; anything already ready lives in the
+  // rechurn callout — no duplicates across panels.
+  function renderUpcoming() {
+    const listEl = el('upcoming-list');
+    if (!listEl) return;
+    const lo = new Date(today); lo.setDate(lo.getDate() + 8);
+    const hi = new Date(today); hi.setDate(hi.getDate() + 90);
+    const rows = [];
+    state.bonuses.forEach(b => {
+      if (b.accountTrack === 'keeper' || b.accountTrack === 'archived') return;
+      if (!isClosedBonus(b) && b.deadline) {
+        const dl = parseDate(b.deadline);
+        if (dl && dl >= lo && dl <= hi) rows.push({ date: dl, b: b, kind: '⏰ DD deadline' });
+      }
+      if (CLOSED_STATUSES.includes(b.status) && !hasNewerActiveEntry(b)) {
+        const nx = computeNextEligible(b);
+        if (nx && nx >= lo && nx <= hi) rows.push({ date: nx, b: b, kind: '🔁 repeat eligible' });
+      }
+    });
+    rows.sort((a, b2) => a.date - b2.date);
+    listEl.innerHTML = rows.length === 0
+      ? '<span class="week-empty">Nothing in the next 90 days.</span>'
+      : rows.map(r =>
+          '<div class="upcoming-row" data-view="' + escHtml(r.b.id) + '" title="Open details">' +
+            '<span class="upcoming-date">' + fmtDate(r.date) + '</span>' +
+            '<span class="upcoming-away">in ' + daysBetween(today, r.date) + 'd</span>' +
+            '<strong>' + escHtml(r.b.bank) + '</strong> ' + personTag(r.b.person) +
+            '<span class="upcoming-kind">' + r.kind + '</span></div>'
+        ).join('');
   }
 
   // ── Rechurn Callout ────────────────────────────────────────────────────
@@ -2926,13 +2994,13 @@
     state.bonuses.forEach(b => {
       const dd = parseDate(b.deadline);
       const rd = parseInt(b.remindBeforeDeadlineDays) || 7;
-      if (dd) { const d = daysBetween(today, dd); if (d !== null && d >= 0 && d <= rd) items.push('⚠️ <strong>'+escHtml(b.bank)+' – '+escHtml(acctLabel(b))+'</strong>: requirement deadline in '+d+' day'+(d===1?'':'s')+' ('+fmtDate(dd)+')'); }
+      if (dd) { const d = daysBetween(today, dd); if (d !== null && d >= 0 && d <= rd) items.push('⚠️ <strong>'+escHtml(b.bank)+' – '+escHtml(acctLabel(b))+'</strong> '+personTag(b.person)+': requirement deadline in '+d+' day'+(d===1?'':'s')+' ('+fmtDate(dd)+')'); }
       const nextEl = computeNextEligible(b);
       const rr = parseInt(b.remindBeforeRepeatDays) || 30;
-      if (nextEl) { const d = daysBetween(today, nextEl); if (d !== null && d >= 0 && d <= rr) items.push('🔁 <strong>'+escHtml(b.bank)+' – '+escHtml(acctLabel(b))+'</strong>: eligible to repeat in '+d+' day'+(d===1?'':'s')+' ('+fmtDate(nextEl)+')'); }
+      if (nextEl) { const d = daysBetween(today, nextEl); if (d !== null && d >= 0 && d <= rr) items.push('🔁 <strong>'+escHtml(b.bank)+' – '+escHtml(acctLabel(b))+'</strong> '+personTag(b.person)+': eligible to repeat in '+d+' day'+(d===1?'':'s')+' ('+fmtDate(nextEl)+')'); }
       if (b.dateOpened && b.plannedLifeMonths) {
         const op = parseDate(b.dateOpened);
-        if (op) { const pc = addMonths(op, parseInt(b.plannedLifeMonths)); const rc = parseInt(b.remindBeforeCloseDays)||14; const d = daysBetween(today, pc); if (d !== null && d >= 0 && d <= rc) items.push('📅 <strong>'+escHtml(b.bank)+' – '+escHtml(acctLabel(b))+'</strong>: planned close in '+d+' day'+(d===1?'':'s')+' ('+fmtDate(pc)+')'); }
+        if (op) { const pc = addMonths(op, parseInt(b.plannedLifeMonths)); const rc = parseInt(b.remindBeforeCloseDays)||14; const d = daysBetween(today, pc); if (d !== null && d >= 0 && d <= rc) items.push('📅 <strong>'+escHtml(b.bank)+' – '+escHtml(acctLabel(b))+'</strong> '+personTag(b.person)+': planned close in '+d+' day'+(d===1?'':'s')+' ('+fmtDate(pc)+')'); }
       }
     });
     if (items.length === 0) { empty.style.display = ''; list.innerHTML = ''; }
@@ -2940,7 +3008,7 @@
   }
 
   function renderAll() {
-    renderSummary(); renderPipeline(); renderWeekWidget();
+    renderSummary(); renderPipeline(); renderWeekWidget(); renderUpcoming();
     renderRechurnCallout(); renderTable(); renderReminders(); renderHistory(); renderKeepers(); renderDDGuide(); renderChangeLog();
   }
 
