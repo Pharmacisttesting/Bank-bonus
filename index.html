@@ -991,12 +991,6 @@
     }
 
     /* ─── Reminders ────────────────────────────────────────────── */
-    #reminders-list li {
-      padding: 6px 0;
-      border-bottom: 1px solid var(--border);
-      font-size: 12px;
-    }
-    #reminders-list li:last-child { border-bottom: none; }
 
     /* ─── Drive section ─────────────────────────────────────────── */
     .drive-section {
@@ -1622,15 +1616,6 @@
           <tbody id="closed-rows"></tbody>
         </table>
       </div>
-    </div>
-
-    <!-- Reminders -->
-    <div class="panel" id="reminders-panel">
-      <div class="panel-header">
-        <span class="panel-title">Upcoming Repeats &amp; Deadlines</span>
-      </div>
-      <p class="helper-text" id="reminders-empty">No upcoming reminders. Set cooldowns, deadlines, or planned close dates to see them here.</p>
-      <ul id="reminders-list" style="list-style:none; padding:0; margin:0;"></ul>
     </div>
 
     <!-- Drive -->
@@ -2654,6 +2639,10 @@
         const nx = computeNextEligible(b);
         if (nx && nx >= lo && nx <= hi) rows.push({ date: nx, b: b, kind: '🔁 repeat eligible' });
       }
+      if (!isClosedBonus(b) && b.dateOpened && b.plannedLifeMonths) {
+        const op = parseDate(b.dateOpened);
+        if (op) { const pc = addMonths(op, parseInt(b.plannedLifeMonths)); if (pc >= lo && pc <= hi) rows.push({ date: pc, b: b, kind: '📅 planned close' }); }
+      }
     });
     rows.sort((a, b2) => a.date - b2.date);
     listEl.innerHTML = rows.length === 0
@@ -2968,29 +2957,9 @@
   }
 
   // ── Reminders ──────────────────────────────────────────────────────────
-  function renderReminders() {
-    const list  = el('reminders-list');
-    const empty = el('reminders-empty');
-    const items = [];
-    state.bonuses.forEach(b => {
-      const dd = parseDate(b.deadline);
-      const rd = parseInt(b.remindBeforeDeadlineDays) || 7;
-      if (dd) { const d = daysBetween(today, dd); if (d !== null && d >= 0 && d <= rd) items.push('⚠️ <strong>'+escHtml(b.bank)+' – '+escHtml(acctLabel(b))+'</strong> '+personTag(b.person)+': requirement deadline in '+d+' day'+(d===1?'':'s')+' ('+fmtDate(dd)+')'); }
-      const nextEl = computeNextEligible(b);
-      const rr = parseInt(b.remindBeforeRepeatDays) || 30;
-      if (nextEl) { const d = daysBetween(today, nextEl); if (d !== null && d >= 0 && d <= rr) items.push('🔁 <strong>'+escHtml(b.bank)+' – '+escHtml(acctLabel(b))+'</strong> '+personTag(b.person)+': eligible to repeat in '+d+' day'+(d===1?'':'s')+' ('+fmtDate(nextEl)+')'); }
-      if (b.dateOpened && b.plannedLifeMonths) {
-        const op = parseDate(b.dateOpened);
-        if (op) { const pc = addMonths(op, parseInt(b.plannedLifeMonths)); const rc = parseInt(b.remindBeforeCloseDays)||14; const d = daysBetween(today, pc); if (d !== null && d >= 0 && d <= rc) items.push('📅 <strong>'+escHtml(b.bank)+' – '+escHtml(acctLabel(b))+'</strong> '+personTag(b.person)+': planned close in '+d+' day'+(d===1?'':'s')+' ('+fmtDate(pc)+')'); }
-      }
-    });
-    if (items.length === 0) { empty.style.display = ''; list.innerHTML = ''; }
-    else { empty.style.display = 'none'; list.innerHTML = items.map(i => '<li>'+i+'</li>').join(''); }
-  }
-
   function renderAll() {
     renderSummary(); renderPipeline(); renderWeekWidget(); renderUpcoming();
-    renderRechurnCallout(); renderTable(); renderReminders(); renderHistory(); renderKeepers(); renderDDGuide(); renderChangeLog();
+    renderRechurnCallout(); renderTable(); renderHistory(); renderKeepers(); renderDDGuide(); renderChangeLog();
   }
 
   // ── Change Log Tab ───────────────────────────────────────────────────
