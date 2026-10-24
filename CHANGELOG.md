@@ -1,4 +1,5 @@
 ## 2026-10-22
+- Removed the green "banks eligible to rechurn now" callout panel — the rechurn action itself stays available from each bonus's Details footer (and the table/history rows), so nothing is lost, just the banner.
 - Merged the two Upcoming panels into one: the bottom Reminders panel is deleted, and planned closes now appear as a third row type in the top Upcoming Repeats & Deadlines panel (deadlines, repeats, planned closes — days 8–90, soonest first, no duplicates with This Week). The per-bonus reminder lead-time fields remain saved on each record but no longer drive a separate panel.
 - Removed the "Fix Account Types" button and its modal — his data check showed 0 type/name conflicts across all 96 records (the site's auto-inference had them all right), so the manual review tool was dead weight. The boot-time auto-inference for legacy records stays.
 - Person tags everywhere they're needed: This Week's Actions and Reminders items now show whose account it is (You / Spouse tag next to the bank).

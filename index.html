@@ -1097,15 +1097,6 @@
     .tab-btn:hover { color:var(--text); background:var(--surface-3); }
     .tab-btn.active { background:var(--surface-2); border-color:var(--border); color:var(--accent); }
 
-    /* ── Rechurn Callout ──────────────────────────────────────── */
-    .rechurn-callout {
-      background:var(--accent-dim); border:1px solid rgba(61,220,132,0.25);
-      border-radius:var(--r-md); padding:12px 16px; margin-bottom:14px;
-    }
-    .rechurn-callout-head { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:13px; }
-    .rechurn-item { padding:10px 0; border-bottom:1px solid rgba(61,220,132,0.1); }
-    .rechurn-item:last-child { border-bottom:none; }
-
     /* ── Bank group header row ────────────────────────────────── */
     .bank-group-header td {
       padding:6px 12px 4px; background:var(--surface-3);
@@ -1507,15 +1498,6 @@
         <div class="summary-value" id="ps-spouse-expected">$0</div>
         <div class="summary-sub" id="ps-spouse-roi"></div>
       </div>
-    </div>
-
-    <!-- ── RECHURN CALLOUT ──────────────────────────────────────── -->
-    <div id="rechurn-callout" style="display:none;" class="rechurn-callout">
-      <div class="rechurn-callout-head">
-        <span>🔁 <strong id="rechurn-count">0</strong> banks eligible to rechurn now</span>
-        <button class="btn-ghost btn-sm" id="rechurn-toggle">Show ▾</button>
-      </div>
-      <div id="rechurn-list" style="display:none; margin-top:10px;"></div>
     </div>
 
     <!-- Pipeline -->
@@ -2130,7 +2112,6 @@
   let bankHistAnchor = null;
   let bankHistScope = 'this';
   let closedSectionOpen = false;
-  let rechurnOpen = false;
   let historyYearFilter = 'all';
 
   const currency = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
@@ -2657,29 +2638,6 @@
   }
 
   // ── Rechurn Callout ────────────────────────────────────────────────────
-  function renderRechurnCallout() {
-    const eligible = state.bonuses.filter(b => isRepeatReady(b) && CLOSED_STATUSES.includes(b.status) && b.accountTrack !== 'keeper' && b.accountTrack !== 'archived');
-    const callout = el('rechurn-callout');
-    if (eligible.length === 0) { callout.style.display = 'none'; return; }
-    callout.style.display = '';
-    el('rechurn-count').textContent = eligible.length;
-    const list = el('rechurn-list');
-    list.innerHTML = eligible.map(b => {
-      const next = computeNextEligible(b);
-      return '<div class="rechurn-item">'+
-        '<div><strong>'+escHtml(b.bank)+'</strong> — '+escHtml(b.accountName || '')+' '+personTag(b.person)+'</div>'+
-        '<div style="font-size:11px;color:var(--text-muted);margin-top:2px">Last bonus: '+currency.format(b.bonusAmount||0)+' · Cooldown ended '+fmtDate(next)+'</div>'+
-        '<div style="margin-top:6px;display:flex;gap:6px;">'+
-          '<button class="btn-primary btn-sm" data-rechurn="'+escHtml(b.id)+'">🔁 Rechurn</button>'+
-          '<button class="btn-ghost btn-sm" data-view="'+escHtml(b.id)+'">👁 View</button>'+
-          historyBtnHtml(b)+
-          '<button class="btn-ghost btn-sm" data-edit="'+escHtml(b.id)+'">Edit</button>'+
-        '</div></div>';
-    }).join('');
-    list.querySelectorAll('[data-rechurn]').forEach(btn => btn.addEventListener('click', () => openRechurn(btn.dataset.rechurn)));
-    list.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => openEdit(btn.dataset.edit)));
-  }
-
   // ── Main Table (active only, grouped by bank) ──────────────────────────
   function filteredBonuses() {
     const sf = el('filter-status').value;
@@ -2959,7 +2917,7 @@
   // ── Reminders ──────────────────────────────────────────────────────────
   function renderAll() {
     renderSummary(); renderPipeline(); renderWeekWidget(); renderUpcoming();
-    renderRechurnCallout(); renderTable(); renderHistory(); renderKeepers(); renderDDGuide(); renderChangeLog();
+    renderTable(); renderHistory(); renderKeepers(); renderDDGuide(); renderChangeLog();
   }
 
   // ── Change Log Tab ───────────────────────────────────────────────────
@@ -4148,13 +4106,6 @@
   el('closed-toggle-btn').addEventListener('click', () => {
     closedSectionOpen = !closedSectionOpen;
     renderClosedSection();
-  });
-
-  // Rechurn callout toggle
-  el('rechurn-toggle').addEventListener('click', () => {
-    rechurnOpen = !rechurnOpen;
-    el('rechurn-list').style.display = rechurnOpen ? '' : 'none';
-    el('rechurn-toggle').textContent = rechurnOpen ? 'Hide ▴' : 'Show ▾';
   });
 
   // Tab switching
