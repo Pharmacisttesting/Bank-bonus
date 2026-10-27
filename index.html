@@ -1614,6 +1614,16 @@
         <button type="button" class="btn-danger btn-sm" id="logout-open-btn-2">⏻ Logout &amp; Clear All Data</button>
         <div style="margin-top:6px;font-size:11px;color:var(--text-muted);">Disconnects Google Drive and removes all data from this browser.</div>
       </div>
+      <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <label for="idle-timeout-select" style="font-size:12px;color:var(--text-muted);">Auto-clear after idle:</label>
+        <select id="idle-timeout-select" class="small-select">
+          <option value="0">Off</option>
+          <option value="30">30 min</option>
+          <option value="60">1 hour</option>
+          <option value="240">4 hours</option>
+        </select>
+        <span style="font-size:11px;color:var(--text-muted);">Signs out and clears this browser's saved data after no activity. Only runs when Drive is connected, so unsynced edits are never wiped.</span>
+      </div>
     </div>
 
   </div><!-- /#tab-dashboard -->
@@ -4161,6 +4171,47 @@
   el('delete-cancel-btn').addEventListener('click', () => { el('delete-modal').style.display = 'none'; });
   el('delete-modal').addEventListener('click', e => { if (e.target === el('delete-modal')) el('delete-modal').style.display = 'none'; });
 
+  // ── Auto-clear after inactivity ───────────────────────────────────────
+  // Unless you log out, everything stays in this browser (localStorage) —
+  // that is why a revisit the next day still shows all your data. With
+  // this on, N minutes of no mouse/keyboard/touch activity signs you out
+  // and clears the browser cache, exactly like the manual Logout button.
+  // SAFETY: it only fires when Drive is connected, and it force-syncs
+  // bonuses + history to Drive first. If Drive is not connected, your
+  // edits may exist only in this browser, so the timer just resets and
+  // nothing is cleared.
+  const IDLE_TIMEOUT_KEY = 'bankBonusIdleTimeoutMin_v1';
+  let idleTimer = null;
+  function idleTimeoutMin() {
+    const v = parseInt(localStorage.getItem(IDLE_TIMEOUT_KEY));
+    return isNaN(v) ? 60 : v;
+  }
+  function resetIdleTimer() {
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = null;
+    const mins = idleTimeoutMin();
+    if (!mins) return;
+    idleTimer = setTimeout(onIdleTimeout, mins * 60 * 1000);
+  }
+  async function onIdleTimeout() {
+    if (!isDriveConnected) { resetIdleTimer(); return; }
+    try {
+      clearTimeout(persistAll._timer);
+      clearTimeout(logHistory._timer);
+      await driveSave();
+      await driveSaveHistory();
+    } catch (e) { resetIdleTimer(); return; }
+    const theme = localStorage.getItem(THEME_KEY);
+    doLogout();
+    if (theme) localStorage.setItem(THEME_KEY, theme);
+  }
+  ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'].forEach(ev =>
+    document.addEventListener(ev, resetIdleTimer, { passive: true }));
+  el('idle-timeout-select').addEventListener('change', e => {
+    localStorage.setItem(IDLE_TIMEOUT_KEY, e.target.value);
+    resetIdleTimer();
+  });
+
   // ── Boot ──────────────────────────────────────────────────────────────
   loadLocal();
   loadHistoryLocal();
@@ -4170,6 +4221,8 @@
   historyFileId  = localStorage.getItem(HISTORY_FILE_ID_KEY)  || null;
   renderAll();
   if (state.bonuses.length > 0) openFormBtn.disabled = false;
+  el('idle-timeout-select').value = String(idleTimeoutMin());
+  resetIdleTimer();
   // maybeEnableDriveButtons is called by gapiLoaded/gisLoaded when APIs are ready.
   // No DOMContentLoaded listener needed — the polling retry in maybeEnableDriveButtons
   // handles the case where the button isn't in the DOM yet when the APIs fire.
