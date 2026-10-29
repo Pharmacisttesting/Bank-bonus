@@ -1623,7 +1623,7 @@
           <option value="60">1 hour</option>
           <option value="240">4 hours</option>
         </select>
-        <span style="font-size:11px;color:var(--text-muted);">Signs out and clears this browser's saved data after no activity. Only runs when Drive is connected, so unsynced edits are never wiped.</span>
+        <span style="font-size:11px;color:var(--text-muted);">Logs you out and clears this browser's saved data after no activity — like a bank website, even if you leave and come back. Reconnect Drive to restore your data.</span>
       </div>
     </div>
 
@@ -4172,22 +4172,62 @@
   el('delete-cancel-btn').addEventListener('click', () => { el('delete-modal').style.display = 'none'; });
   el('delete-modal').addEventListener('click', e => { if (e.target === el('delete-modal')) el('delete-modal').style.display = 'none'; });
 
-  // ── Auto-clear after inactivity ───────────────────────────────────────
-  // Unless you log out, everything stays in this browser (localStorage) —
-  // that is why a revisit the next day still shows all your data. With
-  // this on, N minutes of no mouse/keyboard/touch activity signs you out
-  // and clears the browser cache, exactly like the manual Logout button.
-  // SAFETY: it only fires when Drive is connected, and it force-syncs
-  // bonuses + history to Drive first. If Drive is not connected, your
-  // edits may exist only in this browser, so the timer just resets and
-  // nothing is cleared.
+  // ── Session timeout (bank-style) ──────────────────────────────────────
+  // Like a bank website: N minutes of no activity logs you out and clears
+  // this browser's saved data — whether the tab is still open or you left
+  // and came back later, and whether Drive is connected or not.
+  // How: every activity stamps a last-active time in localStorage. The
+  // in-page timer fires while the tab is open; the boot check fires when
+  // you revisit after being away (a closed tab / sleeping laptop has no
+  // live timer, so wall-clock time since last activity is the check).
+  // If Drive is connected at expiry it force-syncs first; if not, it
+  // still logs out — your Drive copy is what comes back on reconnect.
+  // Only your theme + timeout choice survive a session expiry (they are
+  // preferences, not data). NOTE: THEME_KEY lives in the theme switcher's
+  // own IIFE and is NOT in scope here — the old code referenced it and
+  // threw before logout ever ran, so auto-clear never fired at all.
+  // Use the literal key instead.
   const IDLE_TIMEOUT_KEY = 'bankBonusIdleTimeoutMin_v1';
+  const IDLE_LAST_ACTIVE_KEY = 'bankBonusLastActive_v1';
+  const IDLE_THEME_KEY = 'bbt-theme';
   let idleTimer = null;
+  let lastActiveWrite = 0;
   function idleTimeoutMin() {
-    const v = parseInt(localStorage.getItem(IDLE_TIMEOUT_KEY));
+    const v = parseFloat(localStorage.getItem(IDLE_TIMEOUT_KEY));
     return isNaN(v) ? 60 : v;
   }
+  function stampActivity() {
+    const now = Date.now();
+    if (now - lastActiveWrite < 30000) return; // don't hammer localStorage on every mousemove
+    lastActiveWrite = now;
+    try { localStorage.setItem(IDLE_LAST_ACTIVE_KEY, String(now)); } catch (e) {}
+  }
+  function isSessionExpired() {
+    const mins = idleTimeoutMin();
+    if (!mins) return false;
+    const last = parseInt(localStorage.getItem(IDLE_LAST_ACTIVE_KEY));
+    if (isNaN(last)) return false; // never stamped (first visit) — don't expire
+    return Date.now() - last > mins * 60 * 1000;
+  }
+  function expireSession() {
+    try {
+      const token = gapi?.client?.getToken?.();
+      if (token && typeof google !== 'undefined' && google.accounts?.oauth2)
+        google.accounts.oauth2.revoke(token.access_token, () => {});
+      if (typeof google !== 'undefined' && google.accounts?.id)
+        google.accounts.id.disableAutoSelect();
+      if (typeof gapi !== 'undefined' && gapi.client)
+        gapi.client.setToken(null);
+    } catch (e) { console.warn('[Session] token revoke (non-fatal):', e); }
+    const theme = localStorage.getItem(IDLE_THEME_KEY);
+    const timeoutPref = localStorage.getItem(IDLE_TIMEOUT_KEY);
+    localStorage.clear();
+    if (theme) localStorage.setItem(IDLE_THEME_KEY, theme);
+    if (timeoutPref) localStorage.setItem(IDLE_TIMEOUT_KEY, timeoutPref);
+    location.reload();
+  }
   function resetIdleTimer() {
+    stampActivity();
     if (idleTimer) clearTimeout(idleTimer);
     idleTimer = null;
     const mins = idleTimeoutMin();
@@ -4195,19 +4235,28 @@
     idleTimer = setTimeout(onIdleTimeout, mins * 60 * 1000);
   }
   async function onIdleTimeout() {
-    if (!isDriveConnected) { resetIdleTimer(); return; }
-    try {
-      clearTimeout(persistAll._timer);
-      clearTimeout(logHistory._timer);
-      await driveSave();
-      await driveSaveHistory();
-    } catch (e) { resetIdleTimer(); return; }
-    const theme = localStorage.getItem(THEME_KEY);
-    doLogout();
-    if (theme) localStorage.setItem(THEME_KEY, theme);
+    if (isDriveConnected) {
+      try {
+        clearTimeout(persistAll._timer);
+        clearTimeout(logHistory._timer);
+        await driveSave();
+        await driveSaveHistory();
+      } catch (e) { /* still expire: Drive copy from last good sync is authoritative */ }
+    }
+    expireSession();
   }
   ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'].forEach(ev =>
     document.addEventListener(ev, resetIdleTimer, { passive: true }));
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      try { localStorage.setItem(IDLE_LAST_ACTIVE_KEY, String(Date.now())); } catch (e) {}
+    } else if (isSessionExpired()) {
+      expireSession();
+    }
+  });
+  window.addEventListener('pagehide', () => {
+    try { localStorage.setItem(IDLE_LAST_ACTIVE_KEY, String(Date.now())); } catch (e) {}
+  });
   el('idle-timeout-select').addEventListener('change', e => {
     localStorage.setItem(IDLE_TIMEOUT_KEY, e.target.value);
     resetIdleTimer();
@@ -4217,6 +4266,10 @@
   loadLocal();
   loadHistoryLocal();
   if (migrateAccountTypes()) saveLocal(); // one-time migration: add accountType to old records
+  // Bank-style session check: if your last activity is older than the
+  // timeout, you are logged out on arrival — old data is never shown.
+  // (return skips the rest of boot; expireSession reloads into a clean page.)
+  if (isSessionExpired()) { expireSession(); return; }
   driveFileId    = localStorage.getItem(DRIVE_FILE_ID_KEY)    || null;
   driveFolderId  = localStorage.getItem(DRIVE_FOLDER_ID_KEY)  || null;
   historyFileId  = localStorage.getItem(HISTORY_FILE_ID_KEY)  || null;
