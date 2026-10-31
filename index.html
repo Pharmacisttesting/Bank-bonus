@@ -172,11 +172,7 @@
       const btn = document.getElementById('drive-connect-btn');
       if (btn) {
         btn.disabled = false;
-        btn.title = '';
-        const statusEl = document.getElementById('drive-status');
-        if (statusEl && statusEl.textContent.includes('Loading')) {
-          statusEl.textContent = 'Ready — click Connect Google Drive to sync.';
-        }
+        if (btn.title.indexOf('Waiting') === 0) btn.title = 'Connect Google Drive to sync your bonuses';
       } else {
         // DOM not ready yet — retry until the button exists
         setTimeout(maybeEnableDriveButtons, 100);
@@ -1001,13 +997,6 @@
       margin-top: 10px;
     }
 
-    .drive-status {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-muted);
-      letter-spacing: 0.04em;
-    }
-
     /* ─── Separator line ─────────────────────────────────────── */
     .section-sep {
       height: 1px;
@@ -1451,7 +1440,6 @@
     <button class="tab-btn" data-tab="changelog">Change Log</button>
     <button class="tab-btn" data-tab="settings">Settings</button>
     <button type="button" class="btn-secondary btn-sm" id="drive-connect-btn" disabled title="Waiting for Google APIs to load…" style="margin-left:auto;">Connect Google Drive</button>
-    <span class="drive-status" id="drive-status" style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">⏳ Loading Google APIs…</span>
     <button type="button" id="logout-open-btn" title="Disconnect Drive &amp; clear all local data" style="margin-bottom:1px;background:transparent;color:var(--red);border:1px solid var(--red-dim);padding:5px 13px;border-radius:var(--r-sm);cursor:pointer;font-size:12px;font-family:var(--font-mono);letter-spacing:.04em;transition:all var(--transition);" onmouseover="this.style.background='var(--red-dim)'" onmouseout="this.style.background='transparent'">⏻ Logout</button>
   </div>
 
@@ -2480,7 +2468,27 @@
     }
   }
 
-  function setDriveStatus(msg) { el('drive-status').textContent = msg; }
+  // Save/sync feedback lives on the Connect button itself: its color shows
+  // the state at a glance (green = saved/synced, amber = working, red =
+  // failed), and the full message is kept as a hover tooltip — no status
+  // text anywhere on the page.
+  function setDriveStatus(msg) {
+    const btn = el('drive-connect-btn');
+    if (!btn) return;
+    btn.title = msg || '';
+    const m = (msg || '').toLowerCase();
+    let bg = '', bc = '';
+    if (m.includes('fail') || m.includes('error') || m.includes('cancelled') || m.includes('denied')) {
+      bg = 'rgba(255,94,94,0.20)'; bc = '#ff5e5e';
+    } else if (m.includes('saving') || m.includes('connecting') || m.includes('loading') || m.includes('looking for') || m.includes('uploading')) {
+      bg = 'rgba(245,166,35,0.20)'; bc = '#f5a623';
+    } else if (m.includes('saved') || m.includes('synced') || m.includes('restored')) {
+      bg = 'rgba(61,220,132,0.20)'; bc = '#3ddc84';
+    }
+    btn.style.background = bg;
+    btn.style.borderColor = bc;
+  }
+  window.setDriveStatus = setDriveStatus; // exposed for the test harness
 
   function connectDrive() {
     tokenClient.callback = async (resp) => {
