@@ -1,4 +1,5 @@
 ## 2026-10-31
+- Current Direct Deposits moved out of the Dashboard into its own "Direct Deposits" tab (after DD Guide in the tab bar); same panel, same data, just no longer crowding the Dashboard.
 - New "Current Direct Deposits" panel on the Dashboard: per-person (You / Spouse) pay schedule — Weekly / Biweekly / Semi-monthly / Monthly with the matching rule (weekday, biweekly anchor payday, two days of the month, day of the month) — computing the next payday plus the following four, with the payroll weekend rule (a Sat/Sun payday lands the Friday before). Each person gets unlimited paycheck split rows (bank, nickname, last 4, $ per paycheck, one "gets the rest" row), a net-pay-per-paycheck field, and live totals (fixed splits per paycheck and per month, remainder to the rest destination, over-split and unallocated warnings). Saving a setup archives the previous one into that person's dated History. Stored in the same Drive file as the bonuses (ddSettings key), so it syncs and survives the session timeout. Prefilled from his payroll setup: You semi-monthly 15th & 30th, Spouse biweekly with the anchor left blank to enter.
 
 ## 2026-10-28

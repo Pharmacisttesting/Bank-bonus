@@ -1447,6 +1447,7 @@
     <button class="tab-btn" data-tab="history">History &amp; Timeline</button>
     <button class="tab-btn" data-tab="keepers">Permanent Accounts</button>
     <button class="tab-btn" data-tab="ddguide">DD Guide</button>
+    <button class="tab-btn" data-tab="dd">Current Direct Deposits</button>
     <button class="tab-btn" data-tab="changelog">Change Log</button>
     <div class="theme-switcher" style="margin-left:auto;">
       <span class="theme-switcher-label">Theme</span>
@@ -1519,19 +1520,6 @@
       <div class="week-widget">
         <div class="week-widget-head">📅 Upcoming Repeats &amp; Deadlines <span style="text-transform:none;letter-spacing:0;color:var(--text-muted);">· next 90 days</span></div>
         <div id="upcoming-list"><span class="week-empty">Nothing in the next 90 days.</span></div>
-      </div>
-    </div>
-
-    <!-- Current Direct Deposits -->
-    <div class="panel" id="dd-panel">
-      <div class="panel-header">
-        <span class="panel-title">💵 Current Direct Deposits</span>
-      </div>
-      <p class="helper-text">Where each paycheck actually goes right now — no need to open your payroll account to check. Saved to Drive with your bonuses.</p>
-      <div id="dd-household" style="font-size:12px;color:var(--text-muted);margin-bottom:12px;"></div>
-      <div style="display:flex;gap:16px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:280px;" id="dd-you"></div>
-        <div style="flex:1;min-width:280px;" id="dd-spouse"></div>
       </div>
     </div>
 
@@ -1704,6 +1692,21 @@
       </div>
       <div id="ddguide-list"></div>
       <div class="empty-state" id="ddguide-empty" style="display:none;">No DD methods recorded yet. Fill in “DD Methods That Worked” when adding or editing a bonus and they’ll show up here.</div>
+    </div>
+  </div>
+
+  <!-- ══ DIRECT DEPOSITS TAB ═══════════════════════════════════════════ -->
+  <div id="tab-dd" style="display:none;">
+    <div class="panel" id="dd-panel">
+      <div class="panel-header">
+        <span class="panel-title">💵 Current Direct Deposits</span>
+      </div>
+      <p class="helper-text">Where each paycheck actually goes right now — no need to open your payroll account to check. Saved to Drive with your bonuses.</p>
+      <div id="dd-household" style="font-size:12px;color:var(--text-muted);margin-bottom:12px;"></div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:280px;" id="dd-you"></div>
+        <div style="flex:1;min-width:280px;" id="dd-spouse"></div>
+      </div>
     </div>
   </div>
 
@@ -4461,6 +4464,7 @@
       el('tab-history').style.display   = btn.dataset.tab === 'history'   ? '' : 'none';
       el('tab-keepers').style.display   = btn.dataset.tab === 'keepers'   ? '' : 'none';
       el('tab-ddguide').style.display   = btn.dataset.tab === 'ddguide'   ? '' : 'none';
+      el('tab-dd').style.display        = btn.dataset.tab === 'dd'        ? '' : 'none';
       el('tab-changelog').style.display = btn.dataset.tab === 'changelog' ? '' : 'none';
     });
   });
