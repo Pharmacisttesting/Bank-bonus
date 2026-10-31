@@ -175,7 +175,7 @@
         btn.title = '';
         const statusEl = document.getElementById('drive-status');
         if (statusEl && statusEl.textContent.includes('Loading')) {
-          statusEl.textContent = 'Ready — click Connect Drive to sync.';
+          statusEl.textContent = 'Ready — click Connect Google Drive to sync.';
         }
       } else {
         // DOM not ready yet — retry until the button exists
@@ -1437,7 +1437,7 @@
     </div>
     <div class="header-tips">
       <h3>Workflow</h3>
-      <p>① Connect Drive &nbsp;② Add offers with terms &nbsp;③ Meet requirements &nbsp;④ Update posted/close dates &nbsp;⑤ Use cooldowns &amp; reminders</p>
+      <p>① Connect Google Drive &nbsp;② Add offers with terms &nbsp;③ Meet requirements &nbsp;④ Update posted/close dates &nbsp;⑤ Use cooldowns &amp; reminders</p>
     </div>
   </header>
 
@@ -1456,6 +1456,7 @@
       <button class="theme-btn" data-theme-pick="mcm-dark" title="MCM Dark"></button>
       <button class="theme-btn" data-theme-pick="dark-green" title="Dark Green"></button>
     </div>
+    <button type="button" class="btn-secondary btn-sm" id="drive-connect-btn" disabled title="Waiting for Google APIs to load…">Connect Google Drive</button>
     <button type="button" id="logout-open-btn" title="Disconnect Drive &amp; clear all local data" style="margin-bottom:1px;background:transparent;color:var(--red);border:1px solid var(--red-dim);padding:5px 13px;border-radius:var(--r-sm);cursor:pointer;font-size:12px;font-family:var(--font-mono);letter-spacing:.04em;transition:all var(--transition);" onmouseover="this.style.background='var(--red-dim)'" onmouseout="this.style.background='transparent'">⏻ Logout</button>
   </div>
 
@@ -1608,7 +1609,6 @@
       </div>
       <p class="helper-text">Auto‑saves in this browser. Connect Google Drive once and changes will auto‑sync.</p>
       <div class="drive-section">
-        <button type="button" class="btn-secondary btn-sm" id="drive-connect-btn" disabled title="Waiting for Google APIs to load…">Connect Drive</button>
         <span class="drive-status" id="drive-status">⏳ Loading Google APIs…</span>
       </div>
       <div style="margin-top:10px;">
@@ -1624,7 +1624,6 @@
           <option value="60">1 hour</option>
           <option value="240">4 hours</option>
         </select>
-        <span style="font-size:11px;color:var(--text-muted);">Logs you out and clears this browser's saved data after no activity — like a bank website, even if you leave and come back. Reconnect Drive to restore your data.</span>
       </div>
     </div>
 
