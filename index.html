@@ -1449,14 +1449,8 @@
     <button class="tab-btn" data-tab="ddguide">DD Guide</button>
     <button class="tab-btn" data-tab="dd">Current Direct Deposits</button>
     <button class="tab-btn" data-tab="changelog">Change Log</button>
-    <div class="theme-switcher" style="margin-left:auto;">
-      <span class="theme-switcher-label">Theme</span>
-      <button class="theme-btn active" data-theme-pick="clean-light" title="Clean Light"></button>
-      <button class="theme-btn" data-theme-pick="mcm-light" title="MCM Light"></button>
-      <button class="theme-btn" data-theme-pick="mcm-dark" title="MCM Dark"></button>
-      <button class="theme-btn" data-theme-pick="dark-green" title="Dark Green"></button>
-    </div>
-    <button type="button" class="btn-secondary btn-sm" id="drive-connect-btn" disabled title="Waiting for Google APIs to load…">Connect Google Drive</button>
+    <button class="tab-btn" data-tab="settings">Settings</button>
+    <button type="button" class="btn-secondary btn-sm" id="drive-connect-btn" disabled title="Waiting for Google APIs to load…" style="margin-left:auto;">Connect Google Drive</button>
     <button type="button" id="logout-open-btn" title="Disconnect Drive &amp; clear all local data" style="margin-bottom:1px;background:transparent;color:var(--red);border:1px solid var(--red-dim);padding:5px 13px;border-radius:var(--r-sm);cursor:pointer;font-size:12px;font-family:var(--font-mono);letter-spacing:.04em;transition:all var(--transition);" onmouseover="this.style.background='var(--red-dim)'" onmouseout="this.style.background='transparent'">⏻ Logout</button>
   </div>
 
@@ -1602,27 +1596,6 @@
       </div>
     </div>
 
-    <!-- Drive -->
-    <div class="panel">
-      <div class="panel-header">
-        <span class="panel-title">Backup &amp; Google Drive</span>
-      </div>
-      <p class="helper-text">Auto‑saves in this browser. Connect Google Drive once and changes will auto‑sync.</p>
-      <div class="drive-section">
-        <span class="drive-status" id="drive-status">⏳ Loading Google APIs…</span>
-      </div>
-      <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <label for="idle-timeout-select" style="font-size:12px;color:var(--text-muted);">Auto-clear after idle:</label>
-        <select id="idle-timeout-select" class="small-select">
-          <option value="0">Off</option>
-          <option value="20">20 min</option>
-          <option value="30">30 min</option>
-          <option value="60">1 hour</option>
-          <option value="240">4 hours</option>
-        </select>
-      </div>
-    </div>
-
   </div><!-- /#tab-dashboard -->
 
   <!-- ══ PERMANENT ACCOUNTS TAB ═══════════════════════════════════════ -->
@@ -1717,6 +1690,44 @@
       </div>
       <div id="changelog-list"></div>
       <div class="empty-state" id="changelog-empty">No changes recorded yet. Add, edit, or delete a bonus and it will appear here.</div>
+    </div>
+  </div>
+
+  <!-- ══ SETTINGS TAB ═════════════════════════════════════════════════ -->
+  <div id="tab-settings" style="display:none;">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Settings</span>
+      </div>
+      <div style="margin-bottom:20px;">
+        <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Color theme</div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;">
+          <span style="display:flex;align-items:center;gap:6px;"><button class="theme-btn active" data-theme-pick="clean-light" title="Clean Light"></button><span style="font-size:12px;">Clean Light</span></span>
+          <span style="display:flex;align-items:center;gap:6px;"><button class="theme-btn" data-theme-pick="mcm-light" title="MCM Light"></button><span style="font-size:12px;">MCM Light</span></span>
+          <span style="display:flex;align-items:center;gap:6px;"><button class="theme-btn" data-theme-pick="mcm-dark" title="MCM Dark"></button><span style="font-size:12px;">MCM Dark</span></span>
+          <span style="display:flex;align-items:center;gap:6px;"><button class="theme-btn" data-theme-pick="dark-green" title="Dark Green"></button><span style="font-size:12px;">Dark Green</span></span>
+        </div>
+      </div>
+      <div>
+        <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Auto-clear after idle</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <label for="idle-timeout-select" style="font-size:12px;color:var(--text-muted);">Auto-clear after idle:</label>
+          <select id="idle-timeout-select" class="small-select">
+            <option value="0">Off</option>
+            <option value="20">20 min</option>
+            <option value="30">30 min</option>
+            <option value="60">1 hour</option>
+            <option value="240">4 hours</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:20px;">
+        <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Backup &amp; Google Drive</div>
+        <p class="helper-text">Auto‑saves in this browser. Connect Google Drive once and changes will auto‑sync.</p>
+        <div class="drive-section">
+          <span class="drive-status" id="drive-status">⏳ Loading Google APIs…</span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -4461,6 +4472,7 @@
       el('tab-ddguide').style.display   = btn.dataset.tab === 'ddguide'   ? '' : 'none';
       el('tab-dd').style.display        = btn.dataset.tab === 'dd'        ? '' : 'none';
       el('tab-changelog').style.display = btn.dataset.tab === 'changelog' ? '' : 'none';
+      el('tab-settings').style.display  = btn.dataset.tab === 'settings'  ? '' : 'none';
     });
   });
 
