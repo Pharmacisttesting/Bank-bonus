@@ -1522,6 +1522,19 @@
       </div>
     </div>
 
+    <!-- Current Direct Deposits -->
+    <div class="panel" id="dd-panel">
+      <div class="panel-header">
+        <span class="panel-title">💵 Current Direct Deposits</span>
+      </div>
+      <p class="helper-text">Where each paycheck actually goes right now — no need to open your payroll account to check. Saved to Drive with your bonuses.</p>
+      <div id="dd-household" style="font-size:12px;color:var(--text-muted);margin-bottom:12px;"></div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:280px;" id="dd-you"></div>
+        <div style="flex:1;min-width:280px;" id="dd-spouse"></div>
+      </div>
+    </div>
+
     <!-- Person filter -->
     <div class="person-tabs" id="person-tabs">
       <button class="person-tab active" data-person="all">All</button>
@@ -2106,10 +2119,81 @@
   </div>
 </div>
 
+<!-- Current DD editor modal -->
+<div class="modal-backdrop" id="dd-modal" style="display:none;">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <span class="modal-title" id="dd-modal-title">Edit Direct Deposits</span>
+      <button type="button" class="btn-ghost btn-sm" id="dd-close-btn">✕ Close</button>
+    </div>
+    <div class="modal-body">
+      <form id="dd-form">
+        <input type="hidden" id="dd-person" value="you">
+        <div class="field-grid">
+          <div class="field-section-header">Pay Schedule</div>
+          <div>
+            <label for="dd-frequency">How you get paid</label>
+            <select id="dd-frequency">
+              <option value="weekly">Weekly</option>
+              <option value="biweekly">Biweekly (every 2 weeks)</option>
+              <option value="semimonthly">Semi-monthly (twice a month)</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
+          <div id="dd-rule-weekly" style="display:none;">
+            <label for="dd-weekday">Payday weekday</label>
+            <select id="dd-weekday">
+              <option value="0">Sunday</option>
+              <option value="1">Monday</option>
+              <option value="2">Tuesday</option>
+              <option value="3">Wednesday</option>
+              <option value="4">Thursday</option>
+              <option value="5">Friday</option>
+              <option value="6">Saturday</option>
+            </select>
+          </div>
+          <div id="dd-rule-biweekly" style="display:none;">
+            <label for="dd-anchor">One known payday (anchor date)</label>
+            <input id="dd-anchor" type="date">
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Paydays are every 14 days from this date.</div>
+          </div>
+          <div id="dd-rule-semimonthly" style="display:none;">
+            <label>Paydays (days of the month)</label>
+            <div style="display:flex;gap:8px;">
+              <input id="dd-day1" type="number" min="1" max="31" style="width:80px;" placeholder="15">
+              <input id="dd-day2" type="number" min="1" max="31" style="width:80px;" placeholder="30">
+            </div>
+          </div>
+          <div id="dd-rule-monthly" style="display:none;">
+            <label for="dd-dayofmonth">Payday (day of the month)</label>
+            <input id="dd-dayofmonth" type="number" min="1" max="31" style="width:80px;" placeholder="1">
+          </div>
+          <div>
+            <label for="dd-netpay">Net pay per paycheck ($) <span style="font-weight:400;color:var(--text-dim)">(optional — used for remainder math)</span></label>
+            <input id="dd-netpay" type="number" step="0.01" min="0" placeholder="e.g. 5200">
+          </div>
+          <div class="field-section-header">Paycheck Splits</div>
+          <div style="grid-column:1/-1;">
+            <div id="dd-splits" style="display:flex;flex-direction:column;gap:8px;"></div>
+            <button type="button" class="btn-secondary btn-sm" id="dd-add-split-btn" style="margin-top:8px;">+ Add split</button>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Split your paycheck across banks. One row can be marked "gets the rest" — it takes whatever is left after the fixed $ splits. Use nicknames / last 4 only, never full account numbers.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+          <button type="button" class="btn-ghost btn-sm" id="dd-cancel-btn">Cancel</button>
+          <button type="submit" class="btn-primary btn-sm">Save DD Setup</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <script>
 (function() {
-  const state = { bonuses: [], editingId: null, personFilter: 'all', historyYear: 'all' };
+  const state = { bonuses: [], editingId: null, personFilter: 'all', historyYear: 'all',
+    ddSettings: { you: defaultDDPerson('you'), spouse: defaultDDPerson('spouse') } };
   const STORAGE_KEY          = 'bankBonusData_v2';
+  const DD_LS_KEY            = 'bankBonusDDSettings_v1';
   const DRIVE_FILE_ID_KEY    = 'bankBonusDriveFileId_v1';
   const DRIVE_FOLDER_ID_KEY  = 'bankBonusDriveFolderId_v1';
   const HISTORY_FILE_ID_KEY  = 'bankBonusHistoryFileId_v1';
@@ -2265,10 +2349,11 @@
   }
 
   // ── Persistence ────────────────────────────────────────────────────────
-  function saveLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.bonuses)); }
-  function loadLocal() { try { const r = localStorage.getItem(STORAGE_KEY); if (r) state.bonuses = JSON.parse(r); } catch(e) {} }
-  function serializeData() { return JSON.stringify({ version: 2, bonuses: state.bonuses }, null, 2); }
+  function saveLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.bonuses)); saveDDLocal(); }
+  function loadLocal() { try { const r = localStorage.getItem(STORAGE_KEY); if (r) state.bonuses = JSON.parse(r); } catch(e) {} loadDDLocal(); }
+  function serializeData() { return JSON.stringify({ version: 2, bonuses: state.bonuses, ddSettings: state.ddSettings }, null, 2); }
   function deserializeData(raw) { const p = JSON.parse(raw); if (Array.isArray(p)) return p; if (p && Array.isArray(p.bonuses)) return p.bonuses; return []; }
+  function deserializeFull(raw) { const p = JSON.parse(raw); if (Array.isArray(p)) return { bonuses: p, ddSettings: null }; return { bonuses: (p && Array.isArray(p.bonuses)) ? p.bonuses : [], ddSettings: (p && p.ddSettings) || null }; }
 
   // ── Drive ──────────────────────────────────────────────────────────────
   // Upload or patch a JSON data file inside the folder.
@@ -2349,7 +2434,11 @@
       // Read the file content via the Worker proxy
       const fileRes = await proxyFetch('/drive/v3/files/' + driveFileId + '?alt=media');
       const raw = await fileRes.text();
-      const driveData = deserializeData(raw);
+      const full = deserializeFull(raw);
+      const driveData = full.bonuses;
+      // DD settings: Drive wins when present; otherwise keep local (boot-loaded)
+      // and upload it with the next save below.
+      if (full.ddSettings) state.ddSettings = normalizeDDSettings(full.ddSettings);
 
       // ── Step 4: Merge strategy ────────────────────────────────────────────
       // Drive is the source of truth. But if local storage has entries with IDs
@@ -2376,6 +2465,9 @@
         saveLocal();
         renderAll();
       }
+
+      // DD settings only in this browser so far? Push them to Drive too.
+      if (!full.ddSettings && hasSavedDDSettings()) { await driveSave(); }
 
       await driveLoadHistory();
 
@@ -2929,7 +3021,248 @@
   function renderAll() {
     renderSummary(); renderPipeline(); renderWeekWidget(); renderUpcoming();
     renderTable(); renderHistory(); renderKeepers(); renderDDGuide(); renderChangeLog();
+    renderDDPanel();
   }
+
+  // ── Current Direct Deposits ─────────────────────────────────────────
+  // Per-person pay schedule + paycheck splits, saved in the same Drive
+  // file as the bonuses (ddSettings top-level key) so a session expiry
+  // or a new browser restores them on Drive reconnect. Saving a setup
+  // archives the previous setup into that person's history.
+  const DD_CHECKS_PER_YEAR = { weekly: 52, biweekly: 26, semimonthly: 24, monthly: 12 };
+  const DD_WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  function defaultDDPerson(person) {
+    return { frequency: person === 'you' ? 'semimonthly' : 'biweekly',
+      weekday: 5, anchorDate: '', day1: 15, day2: 30, dayOfMonth: 1,
+      netPay: '', splits: [], history: [], saved: false, effectiveFrom: '' };
+  }
+  function normalizeDDPerson(p, person) {
+    const d = defaultDDPerson(person);
+    if (!p || typeof p !== 'object') return d;
+    const out = Object.assign({}, d, p);
+    out.splits = Array.isArray(p.splits) ? p.splits.map(s => ({ bank: s.bank || '', nickname: s.nickname || '', last4: s.last4 || '', amount: s.amount || '', getsRest: !!s.getsRest })) : [];
+    out.history = Array.isArray(p.history) ? p.history : [];
+    out.saved = !!p.saved;
+    return out;
+  }
+  function normalizeDDSettings(s) {
+    if (!s || typeof s !== 'object') return { you: defaultDDPerson('you'), spouse: defaultDDPerson('spouse') };
+    return { you: normalizeDDPerson(s.you, 'you'), spouse: normalizeDDPerson(s.spouse, 'spouse') };
+  }
+  function saveDDLocal() { try { localStorage.setItem(DD_LS_KEY, JSON.stringify(state.ddSettings)); } catch (e) {} }
+  function loadDDLocal() { try { const r = localStorage.getItem(DD_LS_KEY); if (r) state.ddSettings = normalizeDDSettings(JSON.parse(r)); } catch (e) {} }
+  function hasSavedDDSettings() { return !!(state.ddSettings && (state.ddSettings.you.saved || state.ddSettings.spouse.saved)); }
+  function ddTodayStr() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function ddWeekday(s) { const w = parseInt(s.weekday); return isNaN(w) ? 5 : w; }
+  function ddClampDay(y, m, day) { const last = new Date(y, m + 1, 0).getDate(); return Math.min(Math.max(day || 1, 1), last); }
+  function ddAdjustWeekend(d) { // payroll rule: a weekend payday lands the Friday before
+    const wd = d.getDay();
+    if (wd === 6) return new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1);
+    if (wd === 0) return new Date(d.getFullYear(), d.getMonth(), d.getDate() - 2);
+    return d;
+  }
+  function ddNominalPaydays(s, count) {
+    const out = [];
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    if (s.frequency === 'weekly') {
+      let d = new Date(today);
+      while (d.getDay() !== ddWeekday(s)) d.setDate(d.getDate() + 1);
+      while (out.length < count) { out.push(new Date(d)); d.setDate(d.getDate() + 7); }
+    } else if (s.frequency === 'biweekly') {
+      const a = parseDate(s.anchorDate);
+      if (!a) return out;
+      let d = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+      while (d < today) d.setDate(d.getDate() + 14);
+      while (out.length < count) { out.push(new Date(d)); d.setDate(d.getDate() + 14); }
+    } else if (s.frequency === 'semimonthly') {
+      let y = today.getFullYear(), m = today.getMonth();
+      const days = [...new Set([parseInt(s.day1) || 15, parseInt(s.day2) || 30])].sort((a, b) => a - b);
+      while (out.length < count) {
+        days.forEach(day => { const d = new Date(y, m, ddClampDay(y, m, day)); if (d >= today && out.length < count) out.push(d); });
+        m++; if (m > 11) { m = 0; y++; }
+      }
+    } else { // monthly
+      let y = today.getFullYear(), m = today.getMonth();
+      while (out.length < count) {
+        const d = new Date(y, m, ddClampDay(y, m, parseInt(s.dayOfMonth) || 1));
+        if (d >= today) out.push(d);
+        m++; if (m > 11) { m = 0; y++; }
+      }
+    }
+    return out;
+  }
+  function ddNextPaydays(s, count) {
+    // Adjust each nominal payday for weekends, drop ones that moved into the past.
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return ddNominalPaydays(s, count + 2).map(d => ({ nominal: d, adjusted: ddAdjustWeekend(d) }))
+      .filter(x => x.adjusted >= today).slice(0, count);
+  }
+  function ddScheduleText(s) {
+    if (s.frequency === 'weekly') return 'Weekly · ' + DD_WEEKDAYS[ddWeekday(s)] + 's';
+    if (s.frequency === 'biweekly') return 'Biweekly · every 14 days' + (s.anchorDate && parseDate(s.anchorDate) ? ' from ' + fmtDate(parseDate(s.anchorDate)) : ' (enter an anchor payday)');
+    if (s.frequency === 'semimonthly') return 'Semi-monthly · ' + (parseInt(s.day1) || 15) + 'th & ' + (parseInt(s.day2) || 30) + 'th';
+    return 'Monthly · day ' + (parseInt(s.dayOfMonth) || 1);
+  }
+  function ddSplitText(sp) {
+    const dest = [sp.bank, sp.nickname].filter(Boolean).join(' ') + (sp.last4 ? ' ••' + sp.last4 : '');
+    return (dest || 'Unnamed account') + ' — ' + (sp.getsRest ? 'gets the rest' : currency.format(parseFloat(sp.amount) || 0) + ' / paycheck');
+  }
+  function ddTotals(s) {
+    const fixed = s.splits.reduce((t, sp) => t + (sp.getsRest ? 0 : (parseFloat(sp.amount) || 0)), 0);
+    const rest = s.splits.find(sp => sp.getsRest);
+    const net = parseFloat(s.netPay);
+    return { fixed, rest: !!rest, net: isNaN(net) ? null : net,
+      remainder: isNaN(net) ? null : net - fixed,
+      monthly: fixed * (DD_CHECKS_PER_YEAR[s.frequency] || 12) / 12 };
+  }
+  function renderDDPerson(person) {
+    const s = state.ddSettings[person];
+    const label = person === 'you' ? 'You' : 'Spouse';
+    const t = ddTotals(s);
+    const next = ddNextPaydays(s, 5);
+    let html = '<div style="border:1px solid var(--border);border-radius:var(--r-md);padding:14px;background:var(--surface-2);">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><strong>' + label + '</strong>' +
+      '<button type="button" class="btn-secondary btn-sm" data-dd-edit="' + person + '">✎ Edit</button></div>';
+    html += '<div style="font-size:12px;color:var(--text-muted);margin-top:4px;">' + escHtml(ddScheduleText(s)) + '</div>';
+    if (next.length) {
+      const first = next[0];
+      const moved = first.adjusted.getTime() !== first.nominal.getTime();
+      html += '<div style="font-size:13px;margin-top:8px;">Next payday: <strong>' + fmtDate(first.adjusted) + '</strong>' +
+        (moved ? ' <span style="color:var(--text-muted);">(' + fmtDate(first.nominal) + ' payday moved up — weekend)</span>' : '') + '</div>';
+      if (next.length > 1) html += '<div style="font-size:11px;color:var(--text-muted);">Then: ' + next.slice(1).map(x => fmtDate(x.adjusted)).join(' · ') + '</div>';
+    } else {
+      html += '<div style="font-size:12px;color:var(--text-muted);margin-top:8px;">Next payday: — (enter an anchor payday for biweekly)</div>';
+    }
+    if (s.splits.length) {
+      html += '<div style="margin-top:10px;display:flex;flex-direction:column;gap:4px;font-size:12px;">' +
+        s.splits.map(sp => '<div>• ' + escHtml(ddSplitText(sp)) + '</div>').join('') + '</div>';
+    } else {
+      html += '<div style="font-size:12px;color:var(--text-muted);margin-top:10px;">No splits saved yet — add where this paycheck goes.</div>';
+    }
+    html += '<div style="font-size:12px;margin-top:10px;">Fixed splits: <strong>' + currency.format(t.fixed) + ' / paycheck</strong> · ' + currency.format(t.monthly) + ' / month' +
+      (t.net !== null ? ' · Net: ' + currency.format(t.net) : '') +
+      (t.rest && t.remainder !== null ? ' · Rest: ' + currency.format(t.remainder) : '') + '</div>';
+    if (t.net !== null && t.fixed > t.net) html += '<div style="font-size:12px;color:#e5484d;margin-top:4px;">⚠ Over-split by ' + currency.format(t.fixed - t.net) + ' — fixed splits exceed net pay.</div>';
+    if (t.net !== null && t.fixed < t.net && !t.rest) html += '<div style="font-size:12px;color:#e5484d;margin-top:4px;">⚠ ' + currency.format(t.net - t.fixed) + ' per paycheck unallocated — add a "gets the rest" row or another split.</div>';
+    if (s.saved && s.effectiveFrom) html += '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;">In effect since ' + fmtDate(parseDate(s.effectiveFrom)) + '.</div>';
+    if (s.history.length) {
+      html += '<div style="margin-top:12px;"><div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;">History</div>' +
+        [...s.history].reverse().map(h => '<div style="font-size:12px;padding:6px 0;border-top:1px solid var(--border);">' +
+          '<span style="color:var(--text-muted);">' + (h.from && parseDate(h.from) ? fmtDate(parseDate(h.from)) : '—') + ' – ' + (h.to && parseDate(h.to) ? fmtDate(parseDate(h.to)) : '—') + '</span><br>' +
+          escHtml((h.splits || []).map(ddSplitText).join(' · ') || 'No splits') + '</div>').join('') + '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+  function renderDDPanel() {
+    const y = el('dd-you'), sp = el('dd-spouse'), hh = el('dd-household');
+    if (!y || !sp) return;
+    y.innerHTML = renderDDPerson('you');
+    sp.innerHTML = renderDDPerson('spouse');
+    if (hh) {
+      const ny = ddNextPaydays(state.ddSettings.you, 1)[0];
+      const ns = ddNextPaydays(state.ddSettings.spouse, 1)[0];
+      const monthly = ddTotals(state.ddSettings.you).monthly + ddTotals(state.ddSettings.spouse).monthly;
+      hh.innerHTML = 'Next paydays — You: <strong>' + (ny ? fmtDate(ny.adjusted) : '—') + '</strong> · Spouse: <strong>' + (ns ? fmtDate(ns.adjusted) : '—') + '</strong>' +
+        ' · Combined fixed splits: <strong>' + currency.format(monthly) + ' / month</strong>';
+    }
+  }
+
+  // ── DD editor modal ─────────────────────────────────────────────────
+  let ddDraft = null;
+  function ddToggleRuleGroups() {
+    const f = el('dd-frequency').value;
+    el('dd-rule-weekly').style.display = f === 'weekly' ? '' : 'none';
+    el('dd-rule-biweekly').style.display = f === 'biweekly' ? '' : 'none';
+    el('dd-rule-semimonthly').style.display = f === 'semimonthly' ? '' : 'none';
+    el('dd-rule-monthly').style.display = f === 'monthly' ? '' : 'none';
+  }
+  function ddRenderSplitRows() {
+    const wrap = el('dd-splits');
+    wrap.innerHTML = ddDraft.splits.map((sp, i) =>
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;" data-dd-row="' + i + '">' +
+        '<input type="text" class="small-input dd-bank" placeholder="Bank" value="' + escHtml(sp.bank) + '" style="width:110px;">' +
+        '<input type="text" class="small-input dd-nick" placeholder="Nickname" value="' + escHtml(sp.nickname) + '" style="width:110px;">' +
+        '<input type="text" class="small-input dd-last4" placeholder="Last 4" maxlength="4" value="' + escHtml(sp.last4) + '" style="width:70px;">' +
+        '<input type="number" class="small-input dd-amt" step="0.01" min="0" placeholder="$ / paycheck" value="' + escHtml(sp.amount) + '" style="width:110px;">' +
+        '<label style="font-size:12px;display:flex;gap:4px;align-items:center;"><input type="radio" name="dd-rest" value="' + i + '"' + (sp.getsRest ? ' checked' : '') + '> gets the rest</label>' +
+        '<button type="button" class="btn-ghost btn-sm dd-remove" data-dd-remove="' + i + '">✕</button>' +
+      '</div>').join('') || '<div style="font-size:12px;color:var(--text-muted);">No splits yet.</div>';
+  }
+  function ddSyncDraftFromDOM() {
+    // Read the modal's rows back into the draft WITHOUT dropping empty
+    // rows, so Add/Remove re-renders never eat half-typed input.
+    const rows = [...document.querySelectorAll('#dd-splits [data-dd-row]')];
+    const restIdx = document.querySelector('input[name="dd-rest"]:checked');
+    ddDraft.splits = rows.map((row, i) => ({
+      bank: row.querySelector('.dd-bank').value.trim(),
+      nickname: row.querySelector('.dd-nick').value.trim(),
+      last4: row.querySelector('.dd-last4').value.trim(),
+      amount: row.querySelector('.dd-amt').value.trim(),
+      getsRest: restIdx ? parseInt(restIdx.value) === i : false
+    }));
+  }
+  function ddReadSplitRows() {
+    ddSyncDraftFromDOM();
+    return ddDraft.splits.filter(sp => sp.bank || sp.nickname || sp.amount);
+  }
+  function openDDEdit(person) {
+    ddDraft = JSON.parse(JSON.stringify(state.ddSettings[person]));
+    el('dd-person').value = person;
+    el('dd-modal-title').textContent = 'Edit Direct Deposits — ' + (person === 'you' ? 'You' : 'Spouse');
+    el('dd-frequency').value = ddDraft.frequency;
+    el('dd-weekday').value = String(ddDraft.weekday ?? 5);
+    el('dd-anchor').value = ddDraft.anchorDate || '';
+    el('dd-day1').value = ddDraft.day1 ?? 15;
+    el('dd-day2').value = ddDraft.day2 ?? 30;
+    el('dd-dayofmonth').value = ddDraft.dayOfMonth ?? 1;
+    el('dd-netpay').value = ddDraft.netPay || '';
+    ddToggleRuleGroups();
+    ddRenderSplitRows();
+    el('dd-modal').style.display = 'flex';
+  }
+  function closeDDModal() { el('dd-modal').style.display = 'none'; ddDraft = null; }
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-dd-edit]');
+    if (btn) { openDDEdit(btn.dataset.ddEdit); return; }
+    const rm = e.target.closest('[data-dd-remove]');
+    if (rm && ddDraft) { ddSyncDraftFromDOM(); ddDraft.splits.splice(parseInt(rm.dataset.ddRemove), 1); ddRenderSplitRows(); }
+  });
+  el('dd-frequency').addEventListener('change', ddToggleRuleGroups);
+  el('dd-add-split-btn').addEventListener('click', () => { if (!ddDraft) return; ddSyncDraftFromDOM(); ddDraft.splits.push({ bank: '', nickname: '', last4: '', amount: '', getsRest: false }); ddRenderSplitRows(); });
+  el('dd-close-btn').addEventListener('click', closeDDModal);
+  el('dd-cancel-btn').addEventListener('click', closeDDModal);
+  el('dd-modal').addEventListener('click', e => { if (e.target === el('dd-modal')) closeDDModal(); });
+  el('dd-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const person = el('dd-person').value;
+    const current = state.ddSettings[person];
+    const wdRaw = parseInt(el('dd-weekday').value);
+    const next = {
+      frequency: el('dd-frequency').value,
+      weekday: isNaN(wdRaw) ? 5 : wdRaw,
+      anchorDate: el('dd-anchor').value || '',
+      day1: Math.min(31, Math.max(1, parseInt(el('dd-day1').value) || 15)),
+      day2: Math.min(31, Math.max(1, parseInt(el('dd-day2').value) || 30)),
+      dayOfMonth: Math.min(31, Math.max(1, parseInt(el('dd-dayofmonth').value) || 1)),
+      netPay: el('dd-netpay').value.trim(),
+      splits: ddReadSplitRows(),
+      history: current.history || [],
+      saved: true,
+      effectiveFrom: ddTodayStr()
+    };
+    const strip = s => JSON.stringify({ frequency: s.frequency, weekday: s.weekday, anchorDate: s.anchorDate, day1: s.day1, day2: s.day2, dayOfMonth: s.dayOfMonth, netPay: s.netPay, splits: s.splits });
+    if (current.saved && strip(current) !== strip(next)) {
+      next.history = [...(current.history || []), { from: current.effectiveFrom || '', to: ddTodayStr(),
+        frequency: current.frequency, weekday: current.weekday, anchorDate: current.anchorDate,
+        day1: current.day1, day2: current.day2, dayOfMonth: current.dayOfMonth, netPay: current.netPay,
+        splits: current.splits }];
+    }
+    state.ddSettings[person] = next;
+    persistAll();
+    renderAll();
+    closeDDModal();
+  });
 
   // ── Change Log Tab ───────────────────────────────────────────────────
   let changeLogSearch = '';
