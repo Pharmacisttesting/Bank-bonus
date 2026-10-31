@@ -3136,11 +3136,22 @@
   function renderDDPerson(person) {
     const s = state.ddSettings[person];
     const label = person === 'you' ? 'You' : 'Spouse';
-    const t = ddTotals(s);
-    const next = ddNextPaydays(s, 5);
     let html = '<div style="border:1px solid var(--border);border-radius:var(--r-md);padding:14px;background:var(--surface-2);">';
     html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><strong>' + label + '</strong>' +
       '<button type="button" class="btn-secondary btn-sm" data-dd-edit="' + person + '">✎ Edit</button></div>';
+    if (!s.saved) {
+      // Neutral when nothing is actually saved: the prefill defaults
+      // (semi-monthly 15th & 30th, biweekly) are editor starting points,
+      // not the user's info, and must never be presented as such —
+      // especially after an idle clear wipes local data with Drive
+      // disconnected. No schedule, no paydays, no $0 totals.
+      html += '<div style="font-size:12px;color:var(--text-muted);margin-top:8px;">No direct deposit setup saved yet.</div>' +
+        '<div style="font-size:12px;margin-top:4px;">' + (isDriveConnected ? 'Edit to create one.' : 'Connect Google Drive to restore your saved setup, or Edit to create one.') + '</div>';
+      html += '</div>';
+      return html;
+    }
+    const t = ddTotals(s);
+    const next = ddNextPaydays(s, 5);
     html += '<div style="font-size:12px;color:var(--text-muted);margin-top:4px;">' + escHtml(ddScheduleText(s)) + '</div>';
     if (next.length) {
       const first = next[0];
@@ -3196,12 +3207,16 @@
     y.innerHTML = renderDDPerson('you');
     sp.innerHTML = renderDDPerson('spouse');
     if (hh) {
-      const ny = ddNextPaydays(state.ddSettings.you, 1)[0];
-      const ns = ddNextPaydays(state.ddSettings.spouse, 1)[0];
-      const monthly = ddTotals(state.ddSettings.you).monthlyTotal + ddTotals(state.ddSettings.spouse).monthlyTotal;
-      const avg = ['weekly', 'biweekly'].includes(state.ddSettings.you.frequency) || ['weekly', 'biweekly'].includes(state.ddSettings.spouse.frequency);
-      hh.innerHTML = 'Next paydays — You: <strong>' + (ny ? fmtDate(ny.adjusted) : '—') + '</strong> · Spouse: <strong>' + (ns ? fmtDate(ns.adjusted) : '—') + '</strong>' +
-        ' · Combined total: <strong>' + currency.format(monthly) + ' / month' + (avg ? ' (avg)' : '') + '</strong>';
+      if (!state.ddSettings.you.saved && !state.ddSettings.spouse.saved) {
+        hh.innerHTML = 'No direct deposit setup saved yet.';
+      } else {
+        const ny = ddNextPaydays(state.ddSettings.you, 1)[0];
+        const ns = ddNextPaydays(state.ddSettings.spouse, 1)[0];
+        const monthly = ddTotals(state.ddSettings.you).monthlyTotal + ddTotals(state.ddSettings.spouse).monthlyTotal;
+        const avg = ['weekly', 'biweekly'].includes(state.ddSettings.you.frequency) || ['weekly', 'biweekly'].includes(state.ddSettings.spouse.frequency);
+        hh.innerHTML = 'Next paydays — You: <strong>' + (ny ? fmtDate(ny.adjusted) : '—') + '</strong> · Spouse: <strong>' + (ns ? fmtDate(ns.adjusted) : '—') + '</strong>' +
+          ' · Combined total: <strong>' + currency.format(monthly) + ' / month' + (avg ? ' (avg)' : '') + '</strong>';
+      }
     }
   }
   document.addEventListener('click', e => {
