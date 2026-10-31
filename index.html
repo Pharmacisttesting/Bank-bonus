@@ -1451,6 +1451,7 @@
     <button class="tab-btn" data-tab="changelog">Change Log</button>
     <button class="tab-btn" data-tab="settings">Settings</button>
     <button type="button" class="btn-secondary btn-sm" id="drive-connect-btn" disabled title="Waiting for Google APIs to load…" style="margin-left:auto;">Connect Google Drive</button>
+    <span class="drive-status" id="drive-status" style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">⏳ Loading Google APIs…</span>
     <button type="button" id="logout-open-btn" title="Disconnect Drive &amp; clear all local data" style="margin-bottom:1px;background:transparent;color:var(--red);border:1px solid var(--red-dim);padding:5px 13px;border-radius:var(--r-sm);cursor:pointer;font-size:12px;font-family:var(--font-mono);letter-spacing:.04em;transition:all var(--transition);" onmouseover="this.style.background='var(--red-dim)'" onmouseout="this.style.background='transparent'">⏻ Logout</button>
   </div>
 
@@ -1719,13 +1720,6 @@
             <option value="60">1 hour</option>
             <option value="240">4 hours</option>
           </select>
-        </div>
-      </div>
-      <div style="margin-top:20px;">
-        <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Backup &amp; Google Drive</div>
-        <p class="helper-text">Auto‑saves in this browser. Connect Google Drive once and changes will auto‑sync.</p>
-        <div class="drive-section">
-          <span class="drive-status" id="drive-status">⏳ Loading Google APIs…</span>
         </div>
       </div>
     </div>
