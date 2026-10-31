@@ -3114,10 +3114,17 @@
     const fixed = s.splits.reduce((t, sp) => t + (sp.getsRest ? 0 : (parseFloat(sp.amount) || 0)), 0);
     const rest = s.splits.find(sp => sp.getsRest);
     const net = parseFloat(s.netPay);
+    const checks = DD_CHECKS_PER_YEAR[s.frequency] || 12;
+    // Total money moving per paycheck: when a "gets the rest" row exists and
+    // net pay is known, that's net (fixed + rest) — NOT fixed alone, which
+    // is what the old line showed and why the monthly total looked wrong.
+    const total = (rest && !isNaN(net)) ? net : fixed;
     return { fixed, rest: !!rest, net: isNaN(net) ? null : net,
       remainder: isNaN(net) ? null : net - fixed,
-      monthly: fixed * (DD_CHECKS_PER_YEAR[s.frequency] || 12) / 12 };
+      total, monthlyTotal: total * checks / 12,
+      monthlyAvg: s.frequency === 'weekly' || s.frequency === 'biweekly' };
   }
+  let ddHistoryExpanded = { you: false, spouse: false };
   function renderDDPerson(person) {
     const s = state.ddSettings[person];
     const label = person === 'you' ? 'You' : 'Spouse';
@@ -3142,15 +3149,33 @@
     } else {
       html += '<div style="font-size:12px;color:var(--text-muted);margin-top:10px;">No splits saved yet — add where this paycheck goes.</div>';
     }
-    html += '<div style="font-size:12px;margin-top:10px;">Fixed splits: <strong>' + currency.format(t.fixed) + ' / paycheck</strong> · ' + currency.format(t.monthly) + ' / month' +
-      (t.net !== null ? ' · Net: ' + currency.format(t.net) : '') +
-      (t.rest && t.remainder !== null ? ' · Rest: ' + currency.format(t.remainder) : '') + '</div>';
+    const mLabel = t.monthlyAvg ? ' / month (avg)' : ' / month';
+    if (t.rest && t.net !== null && t.remainder >= 0) {
+      html += '<div style="font-size:12px;margin-top:10px;">Per paycheck: <strong>' + currency.format(t.fixed) + ' fixed + ' + currency.format(t.remainder) + ' rest = ' + currency.format(t.total) + '</strong> · ' + currency.format(t.monthlyTotal) + mLabel + '</div>';
+    } else if (t.rest) {
+      html += '<div style="font-size:12px;margin-top:10px;">Total: <strong>' + currency.format(t.total) + ' / paycheck</strong> · ' + currency.format(t.monthlyTotal) + mLabel + (t.net !== null ? ' · Net: ' + currency.format(t.net) : ' · rest amount unknown (no net pay entered)') + '</div>';
+    } else {
+      html += '<div style="font-size:12px;margin-top:10px;">Total: <strong>' + currency.format(t.total) + ' / paycheck</strong> · ' + currency.format(t.monthlyTotal) + mLabel +
+        (t.net !== null ? ' · Net: ' + currency.format(t.net) : '') + '</div>';
+    }
     if (t.net !== null && t.fixed > t.net) html += '<div style="font-size:12px;color:#e5484d;margin-top:4px;">⚠ Over-split by ' + currency.format(t.fixed - t.net) + ' — fixed splits exceed net pay.</div>';
     if (t.net !== null && t.fixed < t.net && !t.rest) html += '<div style="font-size:12px;color:#e5484d;margin-top:4px;">⚠ ' + currency.format(t.net - t.fixed) + ' per paycheck unallocated — add a "gets the rest" row or another split.</div>';
     if (s.saved && s.effectiveFrom) html += '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;">In effect since ' + fmtDate(parseDate(s.effectiveFrom)) + '.</div>';
     if (s.history.length) {
-      html += '<div style="margin-top:12px;"><div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;">History</div>' +
-        [...s.history].reverse().map(h => '<div style="font-size:12px;padding:6px 0;border-top:1px solid var(--border);">' +
+      // Sort by period end date, newest first — never rely on insertion
+      // order, since edits can archive out of sequence. Undated entries last.
+      const sorted = [...s.history].map((h, i) => ({ h, i })).sort((a, b) => {
+        const da = parseDate(a.h.to) || parseDate(a.h.from);
+        const db = parseDate(b.h.to) || parseDate(b.h.from);
+        if (da && db) return db - da;
+        if (da) return -1; if (db) return 1;
+        return a.i - b.i;
+      }).map(x => x.h);
+      const expanded = ddHistoryExpanded[person];
+      const shown = expanded ? sorted : sorted.slice(0, 3);
+      html += '<div style="margin-top:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);">History</div>' +
+        (sorted.length > 3 ? '<button type="button" class="btn-ghost btn-sm" data-dd-history-toggle="' + person + '">' + (expanded ? 'Show less' : 'Show all (' + sorted.length + ')') + '</button>' : '') + '</div>' +
+        shown.map(h => '<div style="font-size:12px;padding:6px 0;border-top:1px solid var(--border);">' +
           '<span style="color:var(--text-muted);">' + (h.from && parseDate(h.from) ? fmtDate(parseDate(h.from)) : '—') + ' – ' + (h.to && parseDate(h.to) ? fmtDate(parseDate(h.to)) : '—') + '</span><br>' +
           escHtml((h.splits || []).map(ddSplitText).join(' · ') || 'No splits') + '</div>').join('') + '</div>';
     }
@@ -3165,11 +3190,16 @@
     if (hh) {
       const ny = ddNextPaydays(state.ddSettings.you, 1)[0];
       const ns = ddNextPaydays(state.ddSettings.spouse, 1)[0];
-      const monthly = ddTotals(state.ddSettings.you).monthly + ddTotals(state.ddSettings.spouse).monthly;
+      const monthly = ddTotals(state.ddSettings.you).monthlyTotal + ddTotals(state.ddSettings.spouse).monthlyTotal;
+      const avg = ['weekly', 'biweekly'].includes(state.ddSettings.you.frequency) || ['weekly', 'biweekly'].includes(state.ddSettings.spouse.frequency);
       hh.innerHTML = 'Next paydays — You: <strong>' + (ny ? fmtDate(ny.adjusted) : '—') + '</strong> · Spouse: <strong>' + (ns ? fmtDate(ns.adjusted) : '—') + '</strong>' +
-        ' · Combined fixed splits: <strong>' + currency.format(monthly) + ' / month</strong>';
+        ' · Combined total: <strong>' + currency.format(monthly) + ' / month' + (avg ? ' (avg)' : '') + '</strong>';
     }
   }
+  document.addEventListener('click', e => {
+    const tg = e.target.closest('[data-dd-history-toggle]');
+    if (tg) { ddHistoryExpanded[tg.dataset.ddHistoryToggle] = !ddHistoryExpanded[tg.dataset.ddHistoryToggle]; renderDDPanel(); }
+  });
 
   // ── DD editor modal ─────────────────────────────────────────────────
   let ddDraft = null;
@@ -3187,7 +3217,7 @@
         '<input type="text" class="small-input dd-bank" placeholder="Bank" value="' + escHtml(sp.bank) + '" style="width:110px;">' +
         '<input type="text" class="small-input dd-nick" placeholder="Nickname" value="' + escHtml(sp.nickname) + '" style="width:110px;">' +
         '<input type="text" class="small-input dd-last4" placeholder="Last 4" maxlength="4" value="' + escHtml(sp.last4) + '" style="width:70px;">' +
-        '<input type="number" class="small-input dd-amt" step="0.01" min="0" placeholder="$ / paycheck" value="' + escHtml(sp.amount) + '" style="width:110px;">' +
+        '<input type="number" class="small-input dd-amt" step="0.01" min="0" placeholder="$ / paycheck" value="' + escHtml(sp.amount) + '" style="width:110px;"' + (sp.getsRest ? ' disabled' : '') + '>' +
         '<label style="font-size:12px;display:flex;gap:4px;align-items:center;"><input type="radio" name="dd-rest" value="' + i + '"' + (sp.getsRest ? ' checked' : '') + '> gets the rest</label>' +
         '<button type="button" class="btn-ghost btn-sm dd-remove" data-dd-remove="' + i + '">✕</button>' +
       '</div>').join('') || '<div style="font-size:12px;color:var(--text-muted);">No splits yet.</div>';
@@ -3201,13 +3231,15 @@
       bank: row.querySelector('.dd-bank').value.trim(),
       nickname: row.querySelector('.dd-nick').value.trim(),
       last4: row.querySelector('.dd-last4').value.trim(),
-      amount: row.querySelector('.dd-amt').value.trim(),
+      // A "gets the rest" row has no fixed amount — clear any typed value
+      // so it can't linger and confuse the totals.
+      amount: (restIdx && parseInt(restIdx.value) === i) ? '' : row.querySelector('.dd-amt').value.trim(),
       getsRest: restIdx ? parseInt(restIdx.value) === i : false
     }));
   }
   function ddReadSplitRows() {
     ddSyncDraftFromDOM();
-    return ddDraft.splits.filter(sp => sp.bank || sp.nickname || sp.amount);
+    return ddDraft.splits.filter(sp => sp.bank || sp.nickname || sp.amount || sp.getsRest);
   }
   function openDDEdit(person) {
     ddDraft = JSON.parse(JSON.stringify(state.ddSettings[person]));
@@ -3232,6 +3264,9 @@
     if (rm && ddDraft) { ddSyncDraftFromDOM(); ddDraft.splits.splice(parseInt(rm.dataset.ddRemove), 1); ddRenderSplitRows(); }
   });
   el('dd-frequency').addEventListener('change', ddToggleRuleGroups);
+  document.addEventListener('change', e => {
+    if (ddDraft && e.target.matches && e.target.matches('input[name="dd-rest"]')) { ddSyncDraftFromDOM(); ddRenderSplitRows(); }
+  });
   el('dd-add-split-btn').addEventListener('click', () => { if (!ddDraft) return; ddSyncDraftFromDOM(); ddDraft.splits.push({ bank: '', nickname: '', last4: '', amount: '', getsRest: false }); ddRenderSplitRows(); });
   el('dd-close-btn').addEventListener('click', closeDDModal);
   el('dd-cancel-btn').addEventListener('click', closeDDModal);
